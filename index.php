@@ -39,8 +39,12 @@ $salesByDay = $pdo->query("
     ORDER BY fecha ASC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
-// Convertir datos a JSON para JavaScript
 $salesDataJson = json_encode($salesByDay);
+
+
+
+
+
 // Obtener la cantidad de clientes por estado
 $clientsByStatus = $pdo->query("
     SELECT status, COUNT(*) AS total 
@@ -49,10 +53,11 @@ $clientsByStatus = $pdo->query("
     ORDER BY FIELD(status, 'Nuevo', 'Interesado', 'Negociación', 'Comprometido', 'Vendido', 'Perdido')
 ")->fetchAll(PDO::FETCH_ASSOC);
 
-// Convertir los datos a JSON para pasarlos a JavaScript
 $clientsByStatusJson = json_encode($clientsByStatus);
 
-// Consulta SQL para obtener la cantidad de clientes ingresados por usuario
+
+
+//clientes potenciales por usuario
 $clientsByUser = $pdo->query("
     SELECT u.username, COUNT(rc.id) AS total_clientes
     FROM report_clients rc
@@ -62,12 +67,11 @@ $clientsByUser = $pdo->query("
     ORDER BY total_clientes DESC;
 ")->fetchAll(PDO::FETCH_ASSOC);
 
-// Convertir los datos a JSON para usarlos en JavaScript
 $clientsByUserJson = json_encode($clientsByUser);
 
 
 
-
+/////////obtener curos más vendidos desde reportes ///////////////
 $query = "
 WITH words_extracted AS (
     SELECT 
@@ -83,7 +87,7 @@ FROM (
     JOIN (SELECT 1 AS n UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6) numbers
 ) extracted_words
 WHERE LENGTH(word) > 3
-AND word NOT IN ('wsp', 'tx', 'hz', 'prm', 'curso', 'cursos', 'para', 'en', 'el', 'de', 'la', 'los', 'las', 'y', 'premium', 'hazla')
+AND word NOT IN ('wsp', 'tx', 'hz', 'prm', 'curso', 'cursos', 'para', 'en', 'el', 'de', 'la', 'los', 'las', 'y', 'premium')
 GROUP BY word
 ORDER BY total_menciones DESC
 LIMIT 10;
@@ -92,12 +96,11 @@ LIMIT 10;
 $stmt = $pdo->query($query);
 $wordsData = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Convertir los datos a JSON para usarlos en el gráfico
 $wordsDataJson = json_encode($wordsData);
 
 
 
-/// Consulta SQL para obtener los productos más vendidos, normalizados a minúsculas
+/// Consulta SQL para obtener los productos más vendidos
 $query = "
 SELECT LOWER(product_name) AS normalized_product_name, COUNT(*) AS total_vendidos
 FROM sales
@@ -109,7 +112,6 @@ LIMIT 10;
 $stmt = $pdo->query($query);
 $productsData = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Convertir los datos a JSON para usarlos en el gráfico
 $productsDataJson = json_encode($productsData);
 ?>
 
@@ -181,8 +183,7 @@ $productsDataJson = json_encode($productsData);
             }
         </script>
         <div class="container">
-            <button class="btn btn-outline-danger" onclick="window.location.href='logout.php';">Cerrar Sesión</button>
-
+            <a href="logout.php" class="btn btn-outline-danger">Cerrar Sesión</a>
             <h1 class="text-center">Bienvenido(a), <?= htmlspecialchars($username) ?> 👋</h1>
             <hr>
         </div>
@@ -193,22 +194,17 @@ $productsDataJson = json_encode($productsData);
                 <a href="user_crud.php" class="btn btn-primary">Gestionar Usuarios</a>
             <?php endif; ?>
 
-            
-            
-            <button class="btn btn-secondary" onclick="window.location.href='product_crud.php';">Gestionar Productos</button>
-            <button class="btn btn-info" onclick="window.location.href='report_sales.php';">Reportes ventas</button>
-            <button class="btn btn-success" onclick="window.location.href='sales_crud.php';">Registrar Ventas</button>
-            <button class="btn btn-warning" onclick="window.location.href='members_crud.php';">Gestionar Socios</button>
-            <button class="btn btn-danger" onclick="window.location.href='report_crud.php';">Reportes</button>
-            <button class="btn btn-dark" onclick="window.location.href='tracin_crud.php';">Seguimientos</button>
-
-
-
+            <a href="product_crud.php" class="btn btn-secondary">Gestionar Productos</a>
+            <a href="report_sales.php" class="btn btn-info">Reportes ventas</a>
+            <a href="sales_crud.php" class="btn btn-success">Registrar Ventas</a>
+            <a href="members_crud.php" class="btn btn-warning">Gestionar Socios</a>
+            <a href="report_crud.php" class="btn btn-danger">Reportes</a>
+            <a href="tracin_crud.php" class="btn btn-dark">Seguimientos</a>
 
 
         </div>
 
-        <!-- Tabla de ventas 
+        <!-- Tabla de ventas -->
         <h2>Ventas Registradas</h2>
         <table id="salesTable" class="table table-striped">
             <thead>
@@ -233,21 +229,10 @@ $productsDataJson = json_encode($productsData);
                     </tr>
                 <?php endforeach; ?>
             </tbody>
-        </table>-->
+        </table>
         <div class="container mt-4">
             <div class="row g-4"> <!-- Grid con separación entre elementos -->
-                <div class="col-md-6">
-                    <section class="card p-3">
-                        <h2 class="text-center">Clientes Potenciales por Vendedor</h2>
-                        <canvas id="clientsUserChart"></canvas>
-                    </section>
-                </div>
-                <div class="col-md-6">
-                    <section class="card p-3">
-                        <h2 class="text-center">Clientes Potenciales por Estado</h2>
-                        <canvas id="clientsChart"></canvas>
-                    </section>
-                </div>
+
                 <div class="col-md-6">
                     <section class="card p-3">
                         <h2 class="text-center">Cantidad de Productos Vendidos por Día</h2>
@@ -265,11 +250,21 @@ $productsDataJson = json_encode($productsData);
                     </section>
                 </div>
 
-                
+                <div class="col-md-6">
+                    <section class="card p-3">
+                        <h2 class="text-center">Clientes Potenciales por Vendedor</h2>
+                        <canvas id="clientsUserChart"></canvas>
+                    </section>
+                </div>
+                <div class="col-md-6">
+                    <section class="card p-3">
+                        <h2 class="text-center">Clientes Potenciales por Estado</h2>
+                        <canvas id="clientsChart"></canvas>
+                    </section>
+                </div>
             </div>
         </div>
-        <br>
-        <section class="card p-3">
+        <section class="container">
             <h2>Productos Más Vendidos</h2>
             <canvas id="productsChart"></canvas>
 
@@ -305,20 +300,15 @@ $productsDataJson = json_encode($productsData);
 
 
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
     <script>
+        ////////script venta pro día////////
         document.addEventListener("DOMContentLoaded", function () {
-            const salesData = <?= $salesDataJson ?>; // Datos de ventas desde PHP
+            const salesData = <?= $salesDataJson ?>; 
             const labels = salesData.map(item => item.fecha);
             const values = salesData.map(item => item.total_cantidad);
 
-            let startIndex = Math.max(0, labels.length - 30); // Mostrar últimos 30 días por defecto
+            let startIndex = Math.max(0, labels.length - 30);
             let endIndex = labels.length;
 
             const ctx = document.getElementById('salesChart').getContext('2d');
@@ -334,11 +324,11 @@ $productsDataJson = json_encode($productsData);
                         borderWidth: 2,
                         fill: true,
                         tension: 0.2,
-                        pointRadius: 6, // Tamaño de los puntos
-                        pointHoverRadius: 8, // Tamaño al pasar el mouse
-                        pointBackgroundColor: 'rgba(54, 162, 235, 1)', // Color del punto
-                        pointBorderColor: 'rgba(255, 255, 255, 1)', // Borde blanco
-                        pointBorderWidth: 2 // Grosor del borde del punto
+                        pointRadius: 6, 
+                        pointHoverRadius: 8, 
+                        pointBackgroundColor: 'rgba(54, 162, 235, 1)', 
+                        pointBorderColor: 'rgba(255, 255, 255, 1)', 
+                        pointBorderWidth: 2 
                     }]
                 },
                 options: {
@@ -353,7 +343,6 @@ $productsDataJson = json_encode($productsData);
                 }
             });
 
-            // Función para actualizar el gráfico
             function updateChart() {
                 salesChart.data.labels = labels.slice(startIndex, endIndex);
                 salesChart.data.datasets[0].data = values.slice(startIndex, endIndex);
@@ -382,19 +371,18 @@ $productsDataJson = json_encode($productsData);
             });
         });
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <script>
+        /////////////////////////script clientes potenciales por estado//////////////////////
         document.addEventListener("DOMContentLoaded", function () {
             const clientsData = <?= $clientsByStatusJson ?>;
 
-            // Extraer etiquetas (estados) y valores (cantidad de clientes)
             const labels = clientsData.map(item => item.status);
             const values = clientsData.map(item => item.total);
 
             const ctx = document.getElementById('clientsChart').getContext('2d');
             new Chart(ctx, {
-                type: 'doughnut', // Cambiado de 'polarArea' a 'doughnut'
+                type: 'doughnut', 
                 data: {
                     labels: labels,
                     datasets: [{
@@ -431,8 +419,8 @@ $productsDataJson = json_encode($productsData);
                             }
                         }
                     },
-                    cutout: '50%', // Hace que el centro sea más visible
-                    rotation: -90, // Ajusta la rotación para mejor visualización
+                    cutout: '50%', 
+                    rotation: -90, 
                     animation: {
                         animateRotate: true,
                         animateScale: true
@@ -441,14 +429,12 @@ $productsDataJson = json_encode($productsData);
             });
         });
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            const clientsByUser = <?= $clientsByUserJson ?>; // Datos desde PHP
+            const clientsByUser = <?= $clientsByUserJson ?>; 
 
-            // Extraer etiquetas (nombres de usuarios) y valores (cantidad de clientes)
             const labels = clientsByUser.map(item => item.username);
             const values = clientsByUser.map(item => item.total_clientes);
 
@@ -485,14 +471,14 @@ $productsDataJson = json_encode($productsData);
                             color: 'black',
                             font: { size: 14, weight: 'bold' },
                             formatter: (value, context) => {
-                                return context.chart.data.labels[context.dataIndex]; // Solo el nombre del usuario
+                                return context.chart.data.labels[context.dataIndex]; 
                             },
                             anchor: 'center',
                             align: 'center',
                             offset: function (context) {
                                 const meta = context.chart.getDatasetMeta(0);
                                 const arc = meta.data[context.dataIndex];
-                                return arc ? arc.outerRadius / 2.5 : 0; // Centrar la etiqueta en el arco
+                                return arc ? arc.outerRadius / 2.5 : 0; 
                             }
                         }
                     },
@@ -500,10 +486,10 @@ $productsDataJson = json_encode($productsData);
                         r: {
                             pointLabels: {
                                 display: true,
-                                centerPointLabels: true, // Centra los labels en los arcos
+                                centerPointLabels: true, 
                                 font: { size: 14 }
                             },
-                            ticks: { display: true } // Oculta los valores de radio
+                            ticks: { display: true } 
                         }
                     }
                 },
@@ -511,19 +497,16 @@ $productsDataJson = json_encode($productsData);
         });
     </script>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            const wordsData = <?= $wordsDataJson ?>; // Datos desde PHP
+            const wordsData = <?= $wordsDataJson ?>; 
 
-            // Extraer etiquetas (palabras) y valores (cantidad de menciones)
             const labels = wordsData.map(item => item.word);
             const values = wordsData.map(item => item.total_menciones);
 
             const ctx = document.getElementById('wordsChart').getContext('2d');
             new Chart(ctx, {
-                type: 'bar', // Gráfico de barras horizontales
+                type: 'bar', 
                 data: {
                     labels: labels,
                     datasets: [{
@@ -536,9 +519,9 @@ $productsDataJson = json_encode($productsData);
                 },
                 options: {
                     responsive: true,
-                    indexAxis: 'y', // Hace que el gráfico sea horizontal
+                    indexAxis: 'y', 
                     plugins: {
-                        legend: { display: false }, // Ocultar leyenda innecesaria
+                        legend: { display: false }, 
                         tooltip: {
                             callbacks: {
                                 label: function (tooltipItem) {
@@ -555,21 +538,19 @@ $productsDataJson = json_encode($productsData);
             });
         });
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             const productsData = <?= $productsDataJson ?>; // Datos desde PHP
 
-            // Extraer etiquetas (nombres de productos) y valores (total vendidos)
             const labels = productsData.map(item => item.normalized_product_name);
             const values = productsData.map(item => item.total_vendidos);
 
             const ctx = document.getElementById('productsChart').getContext('2d');
             new Chart(ctx, {
-                type: 'bar', // Tipo de gráfico: Barras
+                type: 'bar', 
                 data: {
-                    labels: labels, // Etiquetas (productos)
+                    labels: labels, 
                     datasets: [{
                         label: 'Productos Más Vendidos',
                         data: values, // Datos de ventas
@@ -604,12 +585,12 @@ $productsDataJson = json_encode($productsData);
                     responsive: true,
                     scales: {
                         x: {
-                            stacked: true, // Hacer que las barras sean apiladas
+                            stacked: true, 
                             title: { display: true, text: 'Productos' }
                         },
                         y: {
-                            stacked: true, // Hacer que las barras sean apiladas
-                            beginAtZero: true, // Comienza desde cero
+                            stacked: true, 
+                            beginAtZero: true, /
                             title: { display: true, text: 'Cantidad de Ventas' }
                         }
                     },

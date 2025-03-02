@@ -75,8 +75,7 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
 </head>
 <body class="container py-4">
     <h1 class="text-center">Reportes Personalizados</h1>
-    <button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>
-
+    <a href="report_crud.php" class="btn btn-secondary mb-3">Volver</a>
 
     <form method="GET" action="report_custom.php" class="mb-4">
         <div class="row">

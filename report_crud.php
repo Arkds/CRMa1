@@ -327,8 +327,7 @@ $reports = $stmt->fetchAll();
     <button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>
     <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#reportModal">Agregar Reporte</button>
     <?php if ($isAdmin): ?>
-        <button class="btn btn-info mb-3" onclick="window.location.href='report_custom.php';">Ver Reportes Personalizados</button>
-
+        <a href="report_custom.php" class="btn btn-info mb-3">Ver Reportes Personalizados</a>
     <?php endif; ?>
 
 

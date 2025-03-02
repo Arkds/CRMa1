@@ -1,7 +1,7 @@
 <?php
-$host = '';
-$dbname = '';
-$user = '';
+$host = 'localhost';
+$dbname = 'crm';
+$user = 'root';
 $pass = '';
 
 try {

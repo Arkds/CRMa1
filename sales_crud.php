@@ -131,6 +131,7 @@ if ($action === 'edit' && $id) {
         </script>
         <h1 class="text-center">Gestión de Ventas</h1>
         <button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>
+        <button class="btn btn-outline-primary mb-3" onclick="window.location.replace('commissions_crud.php');">Comisiones</button>
         
 
 
@@ -177,7 +178,7 @@ if ($action === 'edit' && $id) {
 
         <!-- Tabla de ventas -->
         <h2>Ventas Registradas</h2>
-        <table id="salesTable" class="table table-striped">
+        <table id="salesTable" class="table table-striped  ">
             <thead>
                 <tr>
                     <th>ID</th>
