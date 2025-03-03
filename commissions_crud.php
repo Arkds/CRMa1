@@ -14,14 +14,17 @@ $username = $user_data['username'];
 $role = $user_data['role'];
 $isAdmin = ($role === 'admin');
 
+// Obtener la carpeta de Google Drive del usuario
 $stmt = $pdo->prepare("SELECT drive_folder FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
 $user_drive = $stmt->fetch();
 $drive_folder = $user_drive['drive_folder'] ?? null;
 
+// Insertar nueva comisión
 $stmt = $pdo->prepare("INSERT INTO commissions (product_name, price, channel, operation_number, user_id) VALUES (?, ?, ?, ?, ?)");
-$commission_id = $pdo->lastInsertId(); 
+$commission_id = $pdo->lastInsertId(); // Obtener el ID de la nueva comisión
 
+// Guardar múltiples comprobantes
 if (!empty($links)) {
     foreach ($links as $link) {
         if (!empty($link)) {
@@ -32,9 +35,11 @@ if (!empty($links)) {
 }
 
 if ($commission_id) {
+    // Borrar los comprobantes anteriores
     $stmt = $pdo->prepare("DELETE FROM commission_files WHERE commission_id = ?");
     $stmt->execute([$commission_id]);
 
+    // Insertar los nuevos comprobantes
     foreach ($links as $link) {
         if (!empty($link)) {
             $stmt = $pdo->prepare("INSERT INTO commission_files (commission_id, file_link) VALUES (?, ?)");
@@ -45,24 +50,28 @@ if ($commission_id) {
 
 
 // Registrar o Editar Comisión
-
+// Registrar o Editar Comisión
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Capturar valores del formulario
     $product_name = $_POST['product_name'] ?? null;
     $price = $_POST['price'] ?? null;
     $channel = $_POST['channel'] ?? null;
     $operation_number = $_POST['operation_number'] ?? null;
     $description = $_POST['description'] ?? null;
 
-    $links = $_POST['links'] ?? []; 
+    $links = $_POST['links'] ?? []; // Se asegura de obtener un array vacío si no hay enlaces
     $commission_id = $_POST['commission_id'] ?? null;
 
+    // Verificar que los campos requeridos no sean nulos
     if (empty($product_name) || empty($price) || empty($channel) || empty($operation_number)) {
         die("Error: Todos los campos son obligatorios.");
     }
 
     if ($commission_id) {
+        // Capturar la descripción
         $description = $_POST['description'] ?? null;
 
+        // Editar comisión (solo si es dueño del registro o admin)
         $query = $isAdmin
             ? "UPDATE commissions SET product_name=?, price=?, channel=?, operation_number=?, description=? WHERE id=?"
             : "UPDATE commissions SET product_name=?, price=?, channel=?, operation_number=?, description=? WHERE id=? AND user_id=?";
@@ -75,19 +84,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute($params);
         setcookie('success_message', "¡Comisión actualizada correctamente!", time() + 5, "/");
     } else {
+        // Insertar nueva comisión
         $stmt = $pdo->prepare("INSERT INTO commissions (product_name, price, channel, operation_number, description, user_id) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt->execute([$product_name, $price, $channel, $operation_number, $description, $user_id]);
 
-        $commission_id = $pdo->lastInsertId(); 
+        $commission_id = $pdo->lastInsertId(); // Obtener el ID de la nueva comisión
 
         setcookie('success_message', "¡Comisión registrada correctamente!", time() + 5, "/");
     }
 
     // Si hay un ID de comisión, proceder con los comprobantes
     if ($commission_id) {
+        // Eliminar comprobantes previos para esta comisión antes de insertar nuevos
         $stmt = $pdo->prepare("DELETE FROM commission_files WHERE commission_id = ?");
         $stmt->execute([$commission_id]);
 
+        // Insertar nuevos comprobantes
         foreach ($links as $link) {
             if (!empty($link)) {
                 $stmt = $pdo->prepare("INSERT INTO commission_files (commission_id, file_link) VALUES (?, ?)");
@@ -100,6 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
+// Eliminar Comisión (Solo Admin)
 if (isset($_GET['delete']) && $isAdmin) {
     $stmt = $pdo->prepare("DELETE FROM commissions WHERE id = ?");
     $stmt->execute([$_GET['delete']]);
@@ -133,6 +146,44 @@ $commissions = $stmt->fetchAll();
 
 <body>
     <div class="container mt-5">
+        <div id="liveAlertPlaceholder"></div>
+        <button type="button" class="btn btn-outline-dark float-end" id="liveAlertBtn">Ayuda</button>
+
+        <script>
+            const alertPlaceholder = document.getElementById('liveAlertPlaceholder')
+            const appendAlert = (message, type) => {
+                const wrapper = document.createElement('div')
+                wrapper.innerHTML = [
+                    `<div class="alert alert-${type} alert-dismissible" role="alert">`,
+                    `   <div>${message}</div>`,
+                    '   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>',
+                    '</div>'
+                ].join('')
+
+                alertPlaceholder.append(wrapper)
+            }
+
+            // Evento para mostrar la alerta al hacer clic en el botón
+            const alertTrigger = document.getElementById('liveAlertBtn')
+            if (alertTrigger) {
+                alertTrigger.addEventListener('click', () => {
+                    // Lista numerada de instrucciones
+                    const message = `
+                <ol>
+                    <li>Subir tu archivo a la carpeta de drive disponible en "Carpeta de comprobantes".</li>
+                    <li>Luego de subir tu imagen copear el link haciendo click derecho "COMPARTI>LINK".</li>
+                    <li>Llenar detalles de comsión y pegar el link.</li>
+                    <li>Si son más de una imagen agregar campo de otro link con "Agregar más enlaces"</li>
+                    <li>"Guardar Comisión" para guardar comisión.</li>
+                    <li>Se pueden editar todos los campos.</li> 
+                    <li>Para verl el comprobante hacer click en el boton negro de "Captura".</li> 
+                    <li>Si tienes dudas preguntar al administrador, si encuentras fallas reportar.</li> 
+                </ol>
+            `;
+                    appendAlert(message, 'success');
+                })
+            }
+        </script>
         <h1 class="text-center">Gestión de Comisiones</h1>
         <button class="btn btn-secondary mb-3" onclick="window.location.replace('sales_crud.php');">Volver</button>
 
@@ -214,6 +265,7 @@ $commissions = $stmt->fetchAll();
                             $stmt->execute([$commission['id']]);
                             $comprobantes = $stmt->fetchAll(PDO::FETCH_COLUMN); // Obtener solo los valores (enlaces)
                         
+                            // Convertir a JSON para pasarlo a la función de JavaScript
                             $comprobantes_json = htmlspecialchars(json_encode($comprobantes), ENT_QUOTES);
                             ?>
 
@@ -266,8 +318,19 @@ $commissions = $stmt->fetchAll();
                         <hr>
                         <div class="mb-3">
                             <label for="channel" class="form-label">Canal</label>
-                            <input type="text" id="channel" name="channel" class="form-control" required>
+                            <input id="channel" name="channel" class="form-control" list="canales" placeholder="Selecciona o escribe un canal" required>
+                            <datalist id="canales">
+                                <option value="WhatsApp Premium">
+                                <option value="WhatsApp Hazla">
+                                <option value="Messenger Tx">
+                                <option value="Messenger Hazla">
+                                <option value="Messenger Premium">
+                            </datalist>
                         </div>
+
+
+
+
                         <hr>
                         <div class="mb-3">
                             <label for="operation_number" class="form-label">Número de Operación</label>
@@ -308,6 +371,7 @@ $commissions = $stmt->fetchAll();
             document.getElementById("channel").value = channel;
             document.getElementById("operation_number").value = operationNumber;
 
+            // Si la descripción es NULL, asignamos un string vacío
             document.getElementById("description").value = description && description !== "null" ? description : "";
 
             document.querySelector("#commissionModal .modal-title").textContent = "Editar Comisión";
@@ -315,6 +379,7 @@ $commissions = $stmt->fetchAll();
             let container = document.getElementById("comprobantesContainer");
             container.innerHTML = '';
 
+            // Si `links` es un string JSON, lo convertimos a array
             if (typeof links === "string") {
                 try {
                     links = JSON.parse(links);
@@ -323,6 +388,7 @@ $commissions = $stmt->fetchAll();
                 }
             }
 
+            // Si `links` no es un array válido, lo convertimos en un array vacío
             if (!Array.isArray(links)) {
                 links = [];
             }
@@ -345,6 +411,8 @@ $commissions = $stmt->fetchAll();
                 container.appendChild(input);
             }
         }
+
+
 
     </script>
     <script>

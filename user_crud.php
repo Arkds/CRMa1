@@ -77,9 +77,8 @@ $users = $pdo->query("SELECT id, username, role, created_at FROM users")->fetchA
 <body>
 <div class="container mt-5">
     <h1 class="text-center">Gestión de Usuarios</h1>
-    <a href="index.php" class="btn btn-secondary mb-3">Volver</a>
-    <a href="user_crud.php?action=create" class="btn btn-primary mb-3">Agregar Usuario</a>
-
+    <button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>
+    <button class="btn btn-primary mb-3" onclick="window.location.replace('user_crud.php?action=create');">Agregar Usuariob</button>
     <!-- Tabla de Usuarios -->
     <table id="usersTable" class="table table-striped">
         <thead>

@@ -168,7 +168,7 @@ $users = $usersStmt->fetchAll(PDO::FETCH_ASSOC);
         <div class="mt-4">
             <h4>Resumen de Totales</h4>
             <p><strong>Total de Productos Vendidos:</strong> <?= $totalQuantity ?></p>
-
+        
             <?php if ($isAdmin): ?>
                 <p><strong>Monto Total:</strong> S/ <?= number_format($totalAmount, 2) ?></p>
             <?php endif; ?>

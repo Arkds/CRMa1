@@ -327,7 +327,8 @@ $reports = $stmt->fetchAll();
     <button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>
     <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#reportModal">Agregar Reporte</button>
     <?php if ($isAdmin): ?>
-        <a href="report_custom.php" class="btn btn-info mb-3">Ver Reportes Personalizados</a>
+        <button class="btn btn-info mb-3" onclick="window.location.href='report_custom.php';">Ver Reportes Personalizados</button>
+
     <?php endif; ?>
 
 
@@ -532,7 +533,17 @@ $reports = $stmt->fetchAll();
         </select>
 
         <!-- Canal -->
-        <input type="text" name="clientes[${index}][channel]" placeholder="Canal" class="form-control my-1">
+        <input type="text" name="clientes[${index}][channel]" placeholder="Canal" class="form-control my-1" list="canales${index}">
+
+        <!-- Datalist para sugerencias -->
+        <datalist id="canales${index}">
+            <option value="WhatsApp Premium">
+            <option value="WhatsApp Hazla">
+            <option value="Messenger Tx">
+            <option value="Messenger Hazla">
+            <option value="Messenger Premium">
+        </datalist>
+
     </div>`;
 
             container.insertAdjacentHTML("beforeend", input);
@@ -561,7 +572,16 @@ $reports = $stmt->fetchAll();
         </select>
 
         <!-- Canal -->
-        <input type="text" name="editClientes[${index}][channel]" placeholder="Canal" class="form-control my-1" value="${channel}">
+        <input type="text" name="clientes[${index}][channel]" placeholder="Canal" class="form-control my-1" list="canales${index}">
+        
+        <!-- Datalist para sugerencias -->
+        <datalist id="canales${index}">
+            <option value="WhatsApp Premium">
+            <option value="WhatsApp Hazla">
+            <option value="Messenger Tx">
+            <option value="Messenger Hazla">
+            <option value="Messenger Premium">
+        </datalist>
     </div>`;
 
             container.insertAdjacentHTML("beforeend", input);

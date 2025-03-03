@@ -94,10 +94,10 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             }
         </script>
         <h1 class="text-center">Seguimiento de Clientes</h1>
-        <a href="index.php" class="btn btn-secondary mb-3">Volver</a>
+        <button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>
         <!-- Tabla 1: Clientes en proceso -->
         <h2 class="mt-5 text-primary">Clientes en Proceso</h2>
-        <table class="table table-bordered" id="tracintable1">
+        <table class="table table-bordered table-striped" id="tracintable1">
             <thead>
                 <tr>
                     <th>Nombre</th>

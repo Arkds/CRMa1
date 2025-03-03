@@ -172,9 +172,12 @@ $result = $pdo->query($sql);
             }
         </script>
         <h1 class="mb-4">Gestión de Socios</h1>
-        <a href="index.php" class="btn btn-secondary mb-3">Volver</a>
+        <button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>
 
-        <a href="members_crud.php?action=add" class="btn btn-success mb-3">Agregar Nuevo Socio</a>
+
+        <button class="btn btn-success mb-3" onclick="window.location.replace('members_crud.php?action=add');">Agregar Nuevo Socio</button>
+        <a class="btn btn-danger mb-3" href="https://google.com">  test no hacer click </a>
+
 
         <?php if ($action == 'add' || $action == 'edit') { ?>
             <form method="POST" action="" class="mb-4">
@@ -261,18 +264,17 @@ $result = $pdo->query($sql);
                                     echo 'Ninguno';
                                 }
                                 ?>
-                                <a href="members_crud.php?action=edit_benefits&id=<?php echo $row['id']; ?>"
-                                    class="btn btn-info btn-sm">Editar Beneficios</a>
+                                <button class="btn btn-info btn-sm" onclick="window.location.replace('members_crud.php?action=edit_benefits&id=<?php echo $row['id']; ?>');">Editar Beneficios</button>
+
                             </td>
                             <td>
                                 <div class="d-grid gap-2">
-                                    <a href="members_crud.php?action=edit&id=<?php echo $row['id']; ?>"
-                                        class="btn btn-warning btn-sm" style="padding: 2px;">Editar</a>
-                                    <a href="members_crud.php?action=delete&id=<?php echo $row['id']; ?>"
-                                        onclick="return confirm('¿Estás seguro de eliminar este socio?')"
-                                        class="btn btn-danger btn-sm" style="padding: 2px;">Eliminar</a>
-                                    <a href="members_crud.php?action=extend&id=<?php echo $row['id']; ?>"
-                                        class="btn btn-primary btn-sm" style="padding: 2px;">Ampliar Membresía</a>
+                                    <button class="btn btn-warning btn-sm" style="padding: 2px;" onclick="window.location.href='members_crud.php?action=edit&id=<?php echo $row['id']; ?>';">Editar</button>
+
+                                    <button class="btn btn-danger btn-sm" style="padding: 2px;" onclick="if (confirm('¿Estás seguro de eliminar este socio?')) { window.location.href='members_crud.php?action=delete&id=<?php echo $row['id']; ?>'; }">Eliminar</button>
+
+                                    <button class="btn btn-primary btn-sm" style="padding: 2px;" onclick="window.location.href='members_crud.php?action=extend&id=<?php echo $row['id']; ?>';">Ampliar Membresía</button>
+
                                 </div>
                             </td>
 
@@ -309,7 +311,8 @@ $result = $pdo->query($sql);
 
                                 </div>
                                 <button type="submit" class="btn btn-primary">Guardar Cambios</button>
-                                <a href="members_crud.php" class="btn btn-secondary">Cancelar</a>
+                                <button class="btn btn-secondary" onclick="window.location.href='members_crud.php';">Cancelar</button>
+
                             </form>
                         </div>
                     <?php } ?>

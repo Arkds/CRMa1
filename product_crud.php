@@ -70,8 +70,8 @@ $products = $pdo->query("SELECT * FROM products")->fetchAll();
 <body>
 <div class="container mt-5">
     <h1 class="text-center">Gestión de Productos</h1>
-    <a href="index.php" class="btn btn-secondary mb-3">Volver</a>
-    <a href="product_crud.php?action=create" class="btn btn-primary mb-3">Agregar Producto</a>
+    <button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>
+    <button class="btn btn-primary mb-3" onclick="window.location.replace('product_crud.php?action=create');">Agregar Producto</button>
 
     <!-- Tabla de productos -->
     <table id="productsTable" class="table table-striped">
@@ -92,8 +92,8 @@ $products = $pdo->query("SELECT * FROM products")->fetchAll();
                 <td><?= $product['price'] !== null ? $product['price'] : 'No especificado' ?></td>
                 <td><?= $product['description'] ?></td>
                 <td>
-                    <a href="product_crud.php?action=edit&id=<?= $product['id'] ?>" class="btn btn-warning btn-sm">Editar</a>
-                    <a href="product_crud.php?action=delete&id=<?= $product['id'] ?>" class="btn btn-danger btn-sm">Eliminar</a>
+                    <button class="btn btn-warning btn-sm" onclick="window.location.replace('product_crud.php?action=edit&id=<?= $product['id'] ?>');">Editar</button>
+                    <button class="btn btn-danger btn-sm" onclick="window.location.replace('product_crud.php?action=delete&id=<?= $product['id'] ?>');">Eliminar</button>
                 </td>
             </tr>
         <?php endforeach; ?>
