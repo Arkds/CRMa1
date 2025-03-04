@@ -60,103 +60,102 @@ if ($conditions) {
 $stmt = $pdo->prepare($query);
 $stmt->execute($params);
 $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
-?>
+include('header.php')
 
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reportes Personalizados</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <link href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css" rel="stylesheet">
-    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-</head>
-<body class="container py-4">
-    <h1 class="text-center">Reportes Personalizados</h1>
-    <button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>
+    ?>
 
 
-    <form method="GET" action="report_custom.php" class="mb-4">
-        <div class="row">
-            <div class="col-md-3">
-                <label>Tipo de Reporte</label>
-                <select name="type" class="form-control">
-                    <option value="">Todos</option>
-                    <option value="diario">Diario</option>
-                    <option value="semanal">Semanal</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label>Usuario</label>
-                <select name="user_id" class="form-control">
-                    <option value="">Todos</option>
-                    <?php foreach ($users as $user): ?>
-                        <option value="<?= $user['id'] ?>"><?= htmlspecialchars($user['username']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label>Fecha Inicio</label>
-                <input type="date" name="fecha_inicio" class="form-control">
-            </div>
-            <div class="col-md-3">
-                <label>Fecha Fin</label>
-                <input type="date" name="fecha_fin" class="form-control">
-            </div>
-            <div class="col-md-3 mt-4">
-                <button type="submit" class="btn btn-primary">Filtrar</button>
-            </div>
-        </div>
-    </form>
 
-    <table class="table table-striped" id="customreporttable">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Usuario</th>
-                <th>Tipo</th>
-                <th>Fecha</th>
-                <th>Clientes</th>
-                <th>Problemas</th>
-                <th>Cursos Más Vendidos</th>
-                <th>Dudas Frecuentes</th>
-                <th>Recomendaciones</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach ($reports as $report): ?>
+    <div class="container py-4">
+        <h1 class="text-center">Reportes Personalizados</h1>
+        <button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>
+
+
+        <form method="GET" action="report_custom.php" class="mb-4">
+            <div class="row">
+                <div class="col-md-3">
+                    <label>Tipo de Reporte</label>
+                    <select name="type" class="form-control">
+                        <option value="">Todos</option>
+                        <option value="diario">Diario</option>
+                        <option value="semanal">Semanal</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label>Usuario</label>
+                    <select name="user_id" class="form-control">
+                        <option value="">Todos</option>
+                        <?php foreach ($users as $user): ?>
+                            <option value="<?= $user['id'] ?>"><?= htmlspecialchars($user['username']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label>Fecha Inicio</label>
+                    <input type="date" name="fecha_inicio" class="form-control">
+                </div>
+                <div class="col-md-3">
+                    <label>Fecha Fin</label>
+                    <input type="date" name="fecha_fin" class="form-control">
+                </div>
+                <div class="col-md-3 mt-4">
+                    <button type="submit" class="btn btn-primary">Filtrar</button>
+                </div>
+            </div>
+        </form>
+
+        <table class="table table-striped" id="customreporttable">
+            <thead>
                 <tr>
-                    <td><?= htmlspecialchars($report['id']) ?></td>
-                    <td><?= htmlspecialchars($report['usuario']) ?></td>
-                    <td><?= htmlspecialchars($report['type']) ?></td>
-                    <td><?= htmlspecialchars($report['date']) ?></td>
-                    <td><?= htmlspecialchars($report['total_clientes']) ?></td>
-                    <td>
-                        <div class="text-truncate" style="max-width: 150px; cursor:pointer;" onclick="toggleExpand(this)">
-                            <?= htmlspecialchars($report['problemas']) ?: 'No registrado' ?>
-                        </div>
-                    </td>
-                    <td>
-                        <div class="text-truncate" style="max-width: 150px; cursor:pointer;" onclick="toggleExpand(this)">
-                            <?= htmlspecialchars($report['cursos']) ?: 'No registrado' ?>
-                        </div>
-                    </td>
-                    <td>
-                        <div class="text-truncate" style="max-width: 150px; cursor:pointer;" onclick="toggleExpand(this)">
-                            <?= htmlspecialchars($report['dudas']) ?: 'No registrado' ?>
-                        </div>
-                    </td>
-                    <td>
-                        <div class="text-truncate" style="max-width: 150px; cursor:pointer;" onclick="toggleExpand(this)">
-                            <?= htmlspecialchars($report['recomendaciones']) ?: 'No registrado' ?>
-                        </div>
-                    </td>
+                    <th>ID</th>
+                    <th>Usuario</th>
+                    <th>Tipo</th>
+                    <th>Fecha</th>
+                    <th>Clientes</th>
+                    <th>Problemas</th>
+                    <th>Cursos Más Vendidos</th>
+                    <th>Dudas Frecuentes</th>
+                    <th>Recomendaciones</th>
                 </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                <?php foreach ($reports as $report): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($report['id']) ?></td>
+                        <td><?= htmlspecialchars($report['usuario']) ?></td>
+                        <td><?= htmlspecialchars($report['type']) ?></td>
+                        <td><?= htmlspecialchars($report['date']) ?></td>
+                        <td><?= htmlspecialchars($report['total_clientes']) ?></td>
+                        <td>
+                            <div class="text-truncate" style="max-width: 150px; cursor:pointer;"
+                                onclick="toggleExpand(this)">
+                                <?= htmlspecialchars($report['problemas']) ?: 'No registrado' ?>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="text-truncate" style="max-width: 150px; cursor:pointer;"
+                                onclick="toggleExpand(this)">
+                                <?= htmlspecialchars($report['cursos']) ?: 'No registrado' ?>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="text-truncate" style="max-width: 150px; cursor:pointer;"
+                                onclick="toggleExpand(this)">
+                                <?= htmlspecialchars($report['dudas']) ?: 'No registrado' ?>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="text-truncate" style="max-width: 150px; cursor:pointer;"
+                                onclick="toggleExpand(this)">
+                                <?= htmlspecialchars($report['recomendaciones']) ?: 'No registrado' ?>
+                            </div>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+
+    </div>
 
     <script>
         function toggleExpand(element) {
@@ -176,7 +175,7 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 paging: true,
                 searching: true,
                 ordering: true,
-                order: [[3, 'desc']], 
+                order: [[3, 'desc']],
                 language: {
                     url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
                 }
@@ -187,4 +186,5 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
+
 </html>

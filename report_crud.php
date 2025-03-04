@@ -267,220 +267,208 @@ if ($user_role === 'admin') {
 }
 
 $reports = $stmt->fetchAll();
-
-
-
+include('header.php')
 ?>
 
-<!DOCTYPE html>
-<html lang="es">
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestión de Reportes</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css" rel="stylesheet">
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-</head>
+    <div class="container py-4">
+        <div id="liveAlertPlaceholder"></div>
+        <button type="button" class="btn btn-outline-dark float-end" id="liveAlertBtn">Ayuda</button>
 
-<body class="container py-4">
-    <div id="liveAlertPlaceholder"></div>
-    <button type="button" class="btn btn-outline-dark float-end" id="liveAlertBtn">Ayuda</button>
+        <script>
+            const alertPlaceholder = document.getElementById('liveAlertPlaceholder')
+            const appendAlert = (message, type) => {
+                const wrapper = document.createElement('div')
+                wrapper.innerHTML = [
+                    `<div class="alert alert-${type} alert-dismissible" role="alert">`,
+                    `   <div>${message}</div>`,
+                    '   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>',
+                    '</div>'
+                ].join('')
 
-    <script>
-        const alertPlaceholder = document.getElementById('liveAlertPlaceholder')
-        const appendAlert = (message, type) => {
-            const wrapper = document.createElement('div')
-            wrapper.innerHTML = [
-                `<div class="alert alert-${type} alert-dismissible" role="alert">`,
-                `   <div>${message}</div>`,
-                '   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>',
-                '</div>'
-            ].join('')
+                alertPlaceholder.append(wrapper)
+            }
 
-            alertPlaceholder.append(wrapper)
-        }
+            // Evento para mostrar la alerta al hacer clic en el botón
+            const alertTrigger = document.getElementById('liveAlertBtn')
+            if (alertTrigger) {
+                alertTrigger.addEventListener('click', () => {
+                    // Lista numerada de instrucciones
+                    const message = `
+                    <ol>
+                        <li>Tus reportes pueden ser diarios o semanales.</li>
+                        <li>Puedes agregar "n" problemas, cursos, dudas y clientes potenciales.</li>
+                        <li>En clientes no se puede dejar en blanco el email, si el cliente no tiene email coloca "no@no.no".</li>
+                        <li>En clientes, arriba de canal se refiere al estado del cliente.</li>
+                        <li>En canal coloca el canal de venta (a1cursosmaster, whatsapp, messenger de página), el donde encontrar al cliente para hacerle seguimiento".</li>
+                        <li>Si eres venededor solo puedes ver tus reportes.</li> 
+                        <li>Utiliza la barra de búsqueda para encontrar registros específicos.</li> 
+                    </ol>
+                `;
+                    appendAlert(message, 'success');
+                })
+            }
+        </script>
+        <h1 class="text-center">Gestión de Reportes</h1>
+        <button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>
+        <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#reportModal">Agregar Reporte</button>
+        <?php if ($isAdmin): ?>
+            <button class="btn btn-info mb-3" onclick="window.location.href='report_custom.php';">Ver Reportes Personalizados</button>
 
-        // Evento para mostrar la alerta al hacer clic en el botón
-        const alertTrigger = document.getElementById('liveAlertBtn')
-        if (alertTrigger) {
-            alertTrigger.addEventListener('click', () => {
-                // Lista numerada de instrucciones
-                const message = `
-                <ol>
-                    <li>Tus reportes pueden ser diarios o semanales.</li>
-                    <li>Puedes agregar "n" problemas, cursos, dudas y clientes potenciales.</li>
-                    <li>En clientes no se puede dejar en blanco el email, si el cliente no tiene email coloca "no@no.no".</li>
-                    <li>En clientes, arriba de canal se refiere al estado del cliente.</li>
-                    <li>En canal coloca el canal de venta (a1cursosmaster, whatsapp, messenger de página), el donde encontrar al cliente para hacerle seguimiento".</li>
-                    <li>Si eres venededor solo puedes ver tus reportes.</li> 
-                    <li>Utiliza la barra de búsqueda para encontrar registros específicos.</li> 
-                </ol>
-            `;
-                appendAlert(message, 'success');
-            })
-        }
-    </script>
-    <h1 class="text-center">Gestión de Reportes</h1>
-    <button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>
-    <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#reportModal">Agregar Reporte</button>
-    <?php if ($isAdmin): ?>
-        <button class="btn btn-info mb-3" onclick="window.location.href='report_custom.php';">Ver Reportes Personalizados</button>
-
-    <?php endif; ?>
+        <?php endif; ?>
 
 
-    <table class="table table-striped  display compact" id="reportstable">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Usuario</th>
-                <th>Tipo</th>
-                <th>Fecha</th>
-                <th>Acción</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach ($reports as $report): ?>
+        <table class="table table-striped  display compact" id="reportstable">
+            <thead>
                 <tr>
-                    <td><?= $report['id'] ?></td>
-                    <td><?= $report['user_name'] ?></td>
-                    <td><?= $report['type'] ?></td>
-                    <td><?= $report['date'] ?></td>
-                    <td>
-                        <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#editReportModal"
-                            onclick="cargarReporte(<?= $report['id'] ?>)">Ver/Editar</button>
-                    </td>
-
+                    <th>ID</th>
+                    <th>Usuario</th>
+                    <th>Tipo</th>
+                    <th>Fecha</th>
+                    <th>Acción</th>
                 </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                <?php foreach ($reports as $report): ?>
+                    <tr>
+                        <td><?= $report['id'] ?></td>
+                        <td><?= $report['user_name'] ?></td>
+                        <td><?= $report['type'] ?></td>
+                        <td><?= $report['date'] ?></td>
+                        <td>
+                            <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#editReportModal"
+                                onclick="cargarReporte(<?= $report['id'] ?>)">Ver/Editar</button>
+                        </td>
 
-    <!-- Modal para crear reporte -->
-    <div class="modal fade" id="reportModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Nuevo Reporte</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form method="POST" action="report_crud.php?action=create">
-                        <div class="mb-3">
-                            <label class="form-label">Tipo de Reporte</label>
-                            <div>
-                                <button type="button" class="btn btn-outline-primary active"
-                                    id="btnDiario">Diario</button>
-                                <button type="button" class="btn btn-outline-secondary" id="btnSemanal">Semanal</button>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+
+        <!-- Modal para crear reporte -->
+        <div class="modal fade" id="reportModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Nuevo Reporte</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form method="POST" action="report_crud.php?action=create">
+                            <div class="mb-3">
+                                <label class="form-label">Tipo de Reporte</label>
+                                <div>
+                                    <button type="button" class="btn btn-outline-primary active"
+                                        id="btnDiario">Diario</button>
+                                    <button type="button" class="btn btn-outline-secondary" id="btnSemanal">Semanal</button>
+                                </div>
+                                <input type="hidden" name="type" id="reportType" value="diario">
                             </div>
-                            <input type="hidden" name="type" id="reportType" value="diario">
-                        </div>
 
-                        <div id="problemas">
-                            <h6>Problemas</h6>
-                            <div id="problemasContainer"></div>
-                            <button type="button" class="btn btn-sm btn-secondary"
-                                onclick="agregarCampo('problemasContainer', 'problemas[]')">Agregar Problema</button>
-                        </div>
-                        <hr>
-                        <div id="cursos">
-                            <h6>Cursos Más Vendidos</h6>
-                            <div id="cursosContainer"></div>
-                            <button type="button" class="btn btn-sm btn-secondary"
-                                onclick="agregarCampo('cursosContainer', 'cursos[]')">Agregar Curso</button>
-                        </div>
-                        <hr>
-                        <div id="dudas">
-                            <h6>Dudas Frecuentes</h6>
-                            <div id="dudasContainer"></div>
-                            <button type="button" class="btn btn-sm btn-secondary"
-                                onclick="agregarCampo('dudasContainer', 'dudas[]')">Agregar Duda</button>
-                        </div>
-                        <hr>
-                        <div id="clientes">
-                            <h6>Clientes Potenciales</h6>
-                            <div id="clientesContainer"></div>
-                            <button type="button" class="btn btn-sm btn-secondary"
-                                onclick="agregarClienteNuevo('clientesContainer')">
-                                Agregar Cliente
-                            </button>
-                        </div>
-                        <hr>
-                        <div>
-                            <h6>Recomendaciones</h6>
-                            <textarea class="form-control" name="recomendaciones"></textarea>
-                        </div>
-                        <hr>
-                        <button type="submit" class="btn btn-success mt-3">Guardar Reporte</button>
-                    </form>
+                            <div id="problemas">
+                                <h6>Problemas</h6>
+                                <div id="problemasContainer"></div>
+                                <button type="button" class="btn btn-sm btn-secondary"
+                                    onclick="agregarCampo('problemasContainer', 'problemas[]')">Agregar Problema</button>
+                            </div>
+                            <hr>
+                            <div id="cursos">
+                                <h6>Cursos Más Vendidos</h6>
+                                <div id="cursosContainer"></div>
+                                <button type="button" class="btn btn-sm btn-secondary"
+                                    onclick="agregarCampo('cursosContainer', 'cursos[]')">Agregar Curso</button>
+                            </div>
+                            <hr>
+                            <div id="dudas">
+                                <h6>Dudas Frecuentes</h6>
+                                <div id="dudasContainer"></div>
+                                <button type="button" class="btn btn-sm btn-secondary"
+                                    onclick="agregarCampo('dudasContainer', 'dudas[]')">Agregar Duda</button>
+                            </div>
+                            <hr>
+                            <div id="clientes">
+                                <h6>Clientes Potenciales</h6>
+                                <div id="clientesContainer"></div>
+                                <button type="button" class="btn btn-sm btn-secondary"
+                                    onclick="agregarClienteNuevo('clientesContainer')">
+                                    Agregar Cliente
+                                </button>
+                            </div>
+                            <hr>
+                            <div>
+                                <h6>Recomendaciones</h6>
+                                <textarea class="form-control" name="recomendaciones"></textarea>
+                            </div>
+                            <hr>
+                            <button type="submit" class="btn btn-success mt-3">Guardar Reporte</button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-    <!-- Modal para Editar Reporte -->
-    <!-- Modal para Editar Reporte -->
-    <div class="modal fade" id="editReportModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Editar Reporte</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="editReportForm" method="POST" action="report_crud.php?action=edit">
-                        <input type="hidden" id="editReportId" name="id">
-                        <div class="mb-3">
-                            <label class="form-label">Tipo de Reporte</label>
-                            <select class="form-select" id="editReportType" name="type">
-                                <option value="diario">Diario</option>
-                                <option value="semanal">Semanal</option>
-                            </select>
-                        </div>
-                        <div id="editProblemas">
-                            <h6>Problemas</h6>
-                            <div id="editProblemasContainer"></div>
-                            <button type="button" class="btn btn-sm btn-secondary"
-                                onclick="agregarCampo('editProblemasContainer', 'editProblemas[]')">Agregar
-                                Problema</button>
-                        </div>
-                        <hr>
-                        <div id="editCursos">
-                            <h6>Cursos Más Vendidos</h6>
-                            <div id="editCursosContainer"></div>
-                            <button type="button" class="btn btn-sm btn-secondary"
-                                onclick="agregarCampo('editCursosContainer', 'editCursos[]')">Agregar Curso</button>
-                        </div>
-                        <hr>
-                        <div id="editDudas">
-                            <h6>Dudas Frecuentes</h6>
-                            <div id="editDudasContainer"></div>
-                            <button type="button" class="btn btn-sm btn-secondary"
-                                onclick="agregarCampo('editDudasContainer', 'editDudas[]')">Agregar Duda</button>
-                        </div>
-                        <hr>
-                        <div id="editClientes">
-                            <h6>Clientes Potenciales</h6>
-                            <div id="editClientesContainer"></div>
-                            <button type="button" class="btn btn-sm btn-secondary"
-                                onclick="agregarClienteEditar('editClientesContainer')">Agregar Cliente</button>
+        <!-- Modal para Editar Reporte -->
+        <!-- Modal para Editar Reporte -->
+        <div class="modal fade" id="editReportModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Editar Reporte</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="editReportForm" method="POST" action="report_crud.php?action=edit">
+                            <input type="hidden" id="editReportId" name="id">
+                            <div class="mb-3">
+                                <label class="form-label">Tipo de Reporte</label>
+                                <select class="form-select" id="editReportType" name="type">
+                                    <option value="diario">Diario</option>
+                                    <option value="semanal">Semanal</option>
+                                </select>
+                            </div>
+                            <div id="editProblemas">
+                                <h6>Problemas</h6>
+                                <div id="editProblemasContainer"></div>
+                                <button type="button" class="btn btn-sm btn-secondary"
+                                    onclick="agregarCampo('editProblemasContainer', 'editProblemas[]')">Agregar
+                                    Problema</button>
+                            </div>
+                            <hr>
+                            <div id="editCursos">
+                                <h6>Cursos Más Vendidos</h6>
+                                <div id="editCursosContainer"></div>
+                                <button type="button" class="btn btn-sm btn-secondary"
+                                    onclick="agregarCampo('editCursosContainer', 'editCursos[]')">Agregar Curso</button>
+                            </div>
+                            <hr>
+                            <div id="editDudas">
+                                <h6>Dudas Frecuentes</h6>
+                                <div id="editDudasContainer"></div>
+                                <button type="button" class="btn btn-sm btn-secondary"
+                                    onclick="agregarCampo('editDudasContainer', 'editDudas[]')">Agregar Duda</button>
+                            </div>
+                            <hr>
+                            <div id="editClientes">
+                                <h6>Clientes Potenciales</h6>
+                                <div id="editClientesContainer"></div>
+                                <button type="button" class="btn btn-sm btn-secondary"
+                                    onclick="agregarClienteEditar('editClientesContainer')">Agregar Cliente</button>
 
 
-                        </div>
-                        <hr>
-                        <div>
-                            <h6>Recomendaciones</h6>
-                            <textarea class="form-control" id="editRecomendaciones"
-                                name="editRecomendaciones"></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-success mt-3">Guardar Cambios</button>
-                    </form>
+                            </div>
+                            <hr>
+                            <div>
+                                <h6>Recomendaciones</h6>
+                                <textarea class="form-control" id="editRecomendaciones"
+                                    name="editRecomendaciones"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-success mt-3">Guardar Cambios</button>
+                        </form>
+                    </div>
                 </div>
             </div>
-        </div>
+        </div>    
     </div>
+    
 
 
 
