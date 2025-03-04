@@ -21,6 +21,15 @@ if (isset($_COOKIE['user_session'])) {
     header("Location: login.php");
     exit;
 }
+////////////productos relevantes///////
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+// Verificar si es una solicitud AJAX para obtener los productos relevantes
+
+$products = $pdo->query("SELECT relevance, name, price, description FROM products ORDER BY relevance DESC, name ASC")->fetchAll();
+
+///////////////////
 
 // Obtener el nombre del usuario desde la cookie
 $isAdmin = ($role === 'admin'); // Ahora usamos $role desde la cookie
@@ -28,6 +37,7 @@ $isAdmin = ($role === 'admin'); // Ahora usamos $role desde la cookie
 // Consultar ventas
 $stmt = $pdo->query("SELECT * FROM sales ORDER BY created_at DESC");
 $sales = $stmt->fetchAll();
+
 ?>
 
 <?php
@@ -117,6 +127,14 @@ $productsDataJson = json_encode($productsData);
 
 
 
+
+
+
+
+
+
+
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -188,25 +206,38 @@ $productsDataJson = json_encode($productsData);
         </div>
 
         <!-- Botones de navegación -->
-        <div class="d-flex justify-content-between mb-3">
+        <div class="d-flex flex-wrap gap-2 justify-content-center justify-content-md-between mb-3">
             <?php if ($isAdmin): ?>
-                <a href="user_crud.php" class="btn btn-primary">Gestionar Usuarios</a>
+                <a href="user_crud.php" class="btn btn-primary d-flex align-items-center">
+                    <i class="bi bi-people-fill me-2"></i> Gestionar Usuarios
+                </a>
             <?php endif; ?>
-
-            
-            
-            <button class="btn btn-secondary" onclick="window.location.href='product_crud.php';">Gestionar Productos</button>
-            <button class="btn btn-info" onclick="window.location.href='report_sales.php';">Reportes ventas</button>
-            <button class="btn btn-success" onclick="window.location.href='sales_crud.php';">Registrar Ventas</button>
-            <button class="btn btn-warning" onclick="window.location.href='members_crud.php';">Gestionar Socios</button>
-            <button class="btn btn-danger" onclick="window.location.href='report_crud.php';">Reportes</button>
-            <button class="btn btn-dark" onclick="window.location.href='tracin_crud.php';">Seguimientos</button>
-
-
-
-
-
+        
+            <button class="btn btn-secondary d-flex align-items-center" onclick="window.location.href='product_crud.php';">
+                <i class="bi bi-box-seam me-2"></i> Gestionar Productos
+            </button>
+        
+            <button class="btn btn-info d-flex align-items-center" onclick="window.location.href='report_sales.php';">
+                <i class="bi bi-bar-chart-line me-2"></i> Reportes Ventas
+            </button>
+        
+            <button class="btn btn-success d-flex align-items-center" onclick="window.location.href='sales_crud.php';">
+                <i class="bi bi-cash-stack me-2"></i> Registrar Ventas
+            </button>
+        
+            <button class="btn btn-warning d-flex align-items-center" onclick="window.location.href='members_crud.php';">
+                <i class="bi bi-person-badge me-2"></i> Gestionar Socios
+            </button>
+        
+            <button class="btn btn-danger d-flex align-items-center" onclick="window.location.href='report_crud.php';">
+                <i class="bi bi-clipboard-data me-2"></i> Reportes
+            </button>
+        
+            <button class="btn btn-dark d-flex align-items-center" onclick="window.location.href='tracin_crud.php';">
+                <i class="bi bi-journal-check me-2"></i> Seguimientos
+            </button>
         </div>
+
 
         <!-- Tabla de ventas 
         <h2>Ventas Registradas</h2>
@@ -235,7 +266,37 @@ $productsDataJson = json_encode($productsData);
             </tbody>
         </table>-->
         <div class="container mt-4">
+            <div class="col">
+                    <section class="card p-3">
+                        <h2 class="text-center">Precios de productos</h2>
+                        <table id="relevantProductsTable" class="table table-striped display compact">
+                            <thead>
+                                <tr>
+                                    <th>Relevante</th>
+                                    <th>Nombre</th>
+                                    <th>Precio</th>
+                                    <th>Descripción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($products as $product): ?>
+                                    <tr>
+                                        <td><?= $product['relevance'] ? '<span class="badge bg-success">Sí</span>' : '<span class="badge bg-secondary">No</span>' ?>
+                                        </td>
+                                        <td><?= htmlspecialchars($product['name']) ?></td>
+                                        <td><?= $product['price'] !== null ? $product['price'] : 'No especificado' ?></td>
+                                        <td><?= htmlspecialchars($product['description']) ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+
+                    </section>
+                </div>
+
             <div class="row g-4"> <!-- Grid con separación entre elementos -->
+                
+
                 <div class="col-md-6">
                     <section class="card p-3">
                         <h2 class="text-center">Clientes Potenciales por Vendedor</h2>
@@ -265,7 +326,7 @@ $productsDataJson = json_encode($productsData);
                     </section>
                 </div>
 
-                
+
             </div>
         </div>
         <br>
@@ -278,7 +339,7 @@ $productsDataJson = json_encode($productsData);
 
     </div>
 
-    <!-- Inicialización de DataTables -->
+    <!-- Inicialización de DataTables 
     <script>
         $(document).ready(function () {
             $('#salesTable').DataTable({
@@ -291,7 +352,7 @@ $productsDataJson = json_encode($productsData);
                 }
             });
         });
-    </script>
+    </script>-->
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
@@ -627,6 +688,29 @@ $productsDataJson = json_encode($productsData);
             });
         });
     </script>
+    <?php
+
+    $stmt = $pdo->query("SELECT name, price, description FROM products WHERE relevance = 1");
+    $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    echo json_encode($products);
+    ?>
+
+    <script>
+        $(document).ready(function () {
+            $('#relevantProductsTable').DataTable({
+                paging: true,
+                searching: true,
+                order: [[0, 'desc']],
+                language: {
+                    url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
+                }
+            });
+        });
+
+    </script>
+
+
 
 
 </body>

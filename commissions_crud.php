@@ -307,7 +307,7 @@ $commissions = $stmt->fetchAll();
                     <form method="POST">
                         <input type="hidden" id="commission_id" name="commission_id">
                         <div class="mb-3">
-                            <label for="product_name" class="form-label">Producto</label>
+                            <label for="product_name" class="form-label"><strong>Producto</strgon></label>
                             <input type="text" id="product_name" name="product_name" class="form-control" required>
                         </div>
                         <hr>

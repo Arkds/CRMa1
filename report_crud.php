@@ -332,7 +332,7 @@ $reports = $stmt->fetchAll();
     <?php endif; ?>
 
 
-    <table class="table table-striped" id="reportstable">
+    <table class="table table-striped  display compact" id="reportstable">
         <thead>
             <tr>
                 <th>ID</th>

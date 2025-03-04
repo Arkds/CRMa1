@@ -35,7 +35,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 // Obtener clientes con la última edición
-$query = "SELECT *, DATE_FORMAT(updated_at, '%d/%m/%Y %H:%i') AS last_edit FROM report_clients ORDER BY FIELD(status, 'Nuevo', 'Interesado', 'Negociación', 'Comprometido', 'Vendido', 'Perdido')";
+$query = "SELECT *, 
+                 DATE_FORMAT(updated_at, '%d/%m/%Y %H:%i') AS last_edit, 
+                 DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS created_date 
+          FROM report_clients 
+          ORDER BY FIELD(status, 'Nuevo', 'Interesado', 'Negociación', 'Comprometido', 'Vendido', 'Perdido'), created_at DESC";
+
+
 $stmt = $pdo->query($query);
 $clients = [];
 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
@@ -44,6 +50,7 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
 ?>
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -54,6 +61,7 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 </head>
+
 <body>
     <div class="container mt-5">
         <div id="liveAlertPlaceholder"></div>
@@ -100,6 +108,7 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         <table class="table table-bordered table-striped" id="tracintable1">
             <thead>
                 <tr>
+                    <th>Fecha de Creación</th>
                     <th>Nombre</th>
                     <th>Teléfono</th>
                     <th>Email</th>
@@ -117,24 +126,34 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                     if (!empty($clients[$status])):
                         foreach ($clients[$status] as $client): ?>
                             <tr>
+                                <td><?= date("Y-m-d H:i:s", strtotime($client['created_date'])) ?: 'No disponible'; ?></td>
+
+
+
                                 <td><?= htmlspecialchars($client['name']); ?></td>
                                 <td><?= htmlspecialchars($client['phone']); ?></td>
                                 <td><?= htmlspecialchars($client['email']); ?></td>
-                                <td><?= htmlspecialchars($client['description'] ?: 'Sin descripción'); ?></td>
+                                <td>
+                                    <div class="text-truncate" style="max-width: 150px; cursor:pointer;"
+                                        onclick="toggleExpand(this)">
+                                        <?= htmlspecialchars($client['description']) ?: 'Sin descripción' ?>
+                                    </div>
+                                </td>
+
                                 <td><?= htmlspecialchars($client['channel'] ?: 'No especificado'); ?></td>
                                 <td><strong><?= $client['status']; ?></strong></td> <!-- Estado agregado -->
                                 <td><?= $client['last_edit'] ?: 'Nunca editado'; ?></td>
                                 <td>
                                     <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#clientModal"
-    onclick='openModal(<?= $client['id']; ?>, 
+                                        onclick='openModal(<?= $client['id']; ?>, 
     <?= json_encode($client['name']); ?>, 
     <?= json_encode($client['phone']); ?>, 
     <?= json_encode($client['email']); ?>, 
     <?= json_encode($client['description'] ?: ""); ?>, 
     <?= json_encode($client['status']); ?>, 
     <?= json_encode($client['channel'] ?: ""); ?>)'>
-    Editar
-</button>
+                                        Editar
+                                    </button>
 
                                 </td>
                             </tr>
@@ -154,7 +173,7 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                     <th>Email</th>
                     <th>Descripción</th>
                     <th>Canal</th>
-                    <th>Estado</th> 
+                    <th>Estado</th>
                     <th>Última Edición</th>
                     <th>Acciones</th>
                 </tr>
@@ -169,7 +188,12 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                                 <td><?= htmlspecialchars($client['name']); ?></td>
                                 <td><?= htmlspecialchars($client['phone']); ?></td>
                                 <td><?= htmlspecialchars($client['email']); ?></td>
-                                <td><?= htmlspecialchars($client['description'] ?: 'Sin descripción'); ?></td>
+                                <td>
+                                    <div class="text-truncate" style="max-width: 150px; cursor:pointer;"
+                                        onclick="toggleExpand(this)">
+                                        <?= htmlspecialchars($client['description']) ?: 'Sin descripción' ?>
+                                    </div>
+                                </td>
                                 <td><?= htmlspecialchars($client['channel'] ?: 'No especificado'); ?></td>
                                 <td><strong><?= $client['status']; ?></strong></td> <!-- Estado agregado -->
                                 <td><?= $client['last_edit'] ?: 'Nunca editado'; ?></td>
@@ -239,21 +263,21 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
     </div>
     <script>
         function openModal(id, name, phone, email, description, status, channel) {
-        document.getElementById('clientModalLabel').innerText = 'Editar Cliente';
-        document.getElementById('clientId').value = id;
-        document.getElementById('name').value = name;
-        document.getElementById('phone').value = phone;
-        document.getElementById('email').value = email;
-        document.getElementById('description').value = description.replace(/\\n/g, "\n"); // Manejar saltos de línea
-        document.getElementById('status').value = status || 'Nuevo';
-        document.getElementById('channel').value = channel || '';
-    }
+            document.getElementById('clientModalLabel').innerText = 'Editar Cliente';
+            document.getElementById('clientId').value = id;
+            document.getElementById('name').value = name;
+            document.getElementById('phone').value = phone;
+            document.getElementById('email').value = email;
+            document.getElementById('description').value = description.replace(/\\n/g, "\n"); // Manejar saltos de línea
+            document.getElementById('status').value = status || 'Nuevo';
+            document.getElementById('channel').value = channel || '';
+        }
         $(document).ready(function () {
             $('#tracintable1').DataTable({
                 paging: true,
                 searching: true,
                 ordering: true,
-                order: [[6, 'desc']], // Asegúrate de que el índice 6 corresponda a la columna de fecha
+                order: [[0, 'desc']], // Primera columna (Fecha de Creación)
                 language: {
                     url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
                 }
@@ -264,7 +288,7 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                 paging: true,
                 searching: true,
                 ordering: true,
-                order: [[6, 'desc']], // Asegúrate de que el índice 6 corresponda a la columna de fecha
+                order: [[0, 'desc']], // Primera columna (Fecha de Creación)
                 language: {
                     url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
                 }
@@ -272,5 +296,20 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function toggleExpand(element) {
+            if (element.style.whiteSpace === "normal") {
+                element.style.whiteSpace = "nowrap";
+                element.style.overflow = "hidden";
+                element.style.textOverflow = "ellipsis";
+                element.style.maxWidth = "150px";
+            } else {
+                element.style.whiteSpace = "normal";
+                element.style.maxWidth = "none";
+            }
+        }
+    </script>
+
 </body>
+
 </html>
