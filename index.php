@@ -125,18 +125,6 @@ include('header.php')
 ?>
 
 
-
-
-
-
-
-
-
-
-
-
-
-
     <div class="container mt-5">
         <div id="liveAlertPlaceholder"></div>
         <button type="button" class="btn btn-outline-dark float-end" id="liveAlertBtn">Ayuda</button>
