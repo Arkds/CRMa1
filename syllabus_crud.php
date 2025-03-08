@@ -48,7 +48,7 @@ include('header.php');
     </form>
 
     <!-- Tabla de Temarios -->
-    <table id="syllabusTable" class="table table-striped">
+    <table id="syllabusTable" class="table table-striped display compact">
         <thead>
             <tr>
                 <th>ID</th>
@@ -64,7 +64,8 @@ include('header.php');
             <?php foreach ($products as $product): ?>
                 <tr>
                     <td><?= $product['id'] ?></td>
-                    <td><?= $product['relevance'] ? '<span class="badge bg-success">Sí</span>' : '<span class="badge bg-secondary">No</span>' ?></td>
+                    <td><?= $product['relevance'] ? '<span class="badge bg-success">Sí</span>' : '<span class="badge bg-secondary">No</span>' ?>
+                    </td>
                     <td><?= htmlspecialchars($product['name']) ?></td>
                     <td>
                         <div class="text-truncate" style="max-width: 200px; cursor:pointer;" onclick="toggleExpand(this)">
@@ -72,31 +73,42 @@ include('header.php');
                         </div>
                     </td>
                     <td>
-                        <div class="text-truncate" style="max-width: 200px; cursor:pointer;" onclick="toggleExpand(this)">
-                            <?= htmlspecialchars($product['syllabus']) ?>
-                        </div>
-                        <button class="btn btn-sm btn-primary" onclick="copyToClipboard('<?= htmlspecialchars($product['syllabus']) ?>', '<?= htmlspecialchars($product['name']) ?>')">
+                        <button class="btn btn-sm btn-primary"
+                            onclick="copyToClipboard('<?= htmlspecialchars($product['syllabus']) ?>', '<?= htmlspecialchars($product['name']) ?>')">
                             Copiar
                         </button>
                     </td>
-                    <td><?= $product['price'] !== null ? $product['price'] : 'No especificado' ?></td>
+                    <td>
+                        <?= $product['price'] !== null ? $product['price'] : 'No especificado' ?>
+                    </td>
                     <td>
                         <?php
                         $stmt = $pdo->prepare("SELECT p.id, p.name, p.syllabus FROM products p 
-                                               JOIN product_relations r ON p.id = r.related_product_id 
-                                               WHERE r.product_id = ?");
+                           JOIN product_relations r ON p.id = r.related_product_id 
+                           WHERE r.product_id = ?");
                         $stmt->execute([$product['id']]);
                         $related_products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                         if ($related_products) {
-                            foreach ($related_products as $related) {
-                                echo '<button class="btn btn-link p-0" onclick="copyToClipboard(\'' . htmlspecialchars($related['syllabus']) . '\', \'' . htmlspecialchars($related['name']) . '\')">' . htmlspecialchars($related['name']) . '</button><br>';
-                            }
-                        } else {
+                            // ID único para la sección de productos relacionados
+                            $relatedId = "related-" . $product['id'];
+                            ?>
+                            <button class="btn btn-sm btn-light" onclick="toggleRelatedProducts('<?= $relatedId ?>', this)">
+                                ▼
+                            </button>
+                            <div id="<?= $relatedId ?>" style="display: none; margin-top: 5px;">
+                                <?php foreach ($related_products as $related): ?>
+                                    <button class="btn btn-sm btn-outline-primary"
+                                        onclick="copyToClipboard('<?= htmlspecialchars($related['syllabus']) ?>', '<?= htmlspecialchars($related['name']) ?>')">
+                                        <?= htmlspecialchars($related['name']) ?>
+                                    </button><br>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php } else {
                             echo 'No relacionados';
-                        }
-                        ?>
+                        } ?>
                     </td>
+
                 </tr>
             <?php endforeach; ?>
         </tbody>
@@ -106,6 +118,11 @@ include('header.php');
 <!-- Script para copiar texto al portapapeles y toggle -->
 <script>
     function copyToClipboard(text, productName) {
+        if (!text || text.trim() === "Sin temario") {
+            alert("Este producto no tiene temario disponible.");
+            return;
+        }
+
         navigator.clipboard.writeText(text).then(() => {
             alert("Temario de " + productName + " copiado al portapapeles.");
         }).catch(err => {
@@ -125,6 +142,17 @@ include('header.php');
         }
     }
 
+    function toggleRelatedProducts(relatedId, button) {
+        let relatedDiv = document.getElementById(relatedId);
+
+        if (relatedDiv.style.display === "none") {
+            relatedDiv.style.display = "block";
+            button.innerHTML = "▲"; // Cambia a flecha hacia arriba
+        } else {
+            relatedDiv.style.display = "none";
+            button.innerHTML = "▼"; // Cambia a flecha hacia abajo
+        }
+    }
     function filterTable() {
         let inputName = document.getElementById("searchName").value.toLowerCase();
         let inputRelevance = document.getElementById("searchRelevance").value;
@@ -165,4 +193,5 @@ include('header.php');
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
+
 </html>

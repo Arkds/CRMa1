@@ -390,17 +390,14 @@ include('header.php')
                 }
             }
         });
-
         // Función para actualizar el gráfico
         function updateChart() {
             salesChart.data.labels = labels.slice(startIndex, endIndex);
             salesChart.data.datasets[0].data = values.slice(startIndex, endIndex);
             salesChart.update();
-
             document.getElementById('nextBtn').disabled = (endIndex >= labels.length);
             document.getElementById('prevBtn').disabled = (startIndex <= 0);
         }
-
         // Botón para ver 30 días anteriores
         document.getElementById('prevBtn').addEventListener('click', function () {
             if (startIndex > 0) {
@@ -409,7 +406,6 @@ include('header.php')
                 updateChart();
             }
         });
-
         // Botón para ver 30 días siguientes
         document.getElementById('nextBtn').addEventListener('click', function () {
             if (endIndex < labels.length) {
@@ -420,7 +416,6 @@ include('header.php')
         });
     });
 </script>
-
 <script>
     document.addEventListener("DOMContentLoaded", function () {
         const clientsData = <?= $clientsByStatusJson ?>;
@@ -478,7 +473,6 @@ include('header.php')
         });
     });
 </script>
-
 <script>
     document.addEventListener("DOMContentLoaded", function () {
         const clientsByUser = <?= $clientsByUserJson ?>; // Datos desde PHP
@@ -545,8 +539,6 @@ include('header.php')
         });
     });
 </script>
-
-
 <script>
     document.addEventListener("DOMContentLoaded", function () {
         const wordsData = <?= $wordsDataJson ?>; // Datos desde PHP
@@ -589,7 +581,6 @@ include('header.php')
         });
     });
 </script>
-
 <script>
     document.addEventListener("DOMContentLoaded", function () {
         const productsData = <?= $productsDataJson ?>; // Datos desde PHP
@@ -661,13 +652,11 @@ include('header.php')
     });
 </script>
 <?php
-
 $stmt = $pdo->query("SELECT name, price, description FROM products WHERE relevance = 1");
 $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 echo json_encode($products);
 ?>
-
 <script>
     $(document).ready(function () {
         $('#relevantProductsTable').DataTable({
@@ -679,12 +668,7 @@ echo json_encode($products);
             }
         });
     });
-
 </script>
-
-
-
-
 </body>
 
 </html>
