@@ -29,23 +29,8 @@ include('header.php');
     <h1 class="text-center">Gestión de Temarios</h1>
     <button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>
 
-    <!-- Filtros -->
-    <form method="GET" action="syllabus_crud.php" class="mb-4">
-        <div class="row">
-            <div class="col-md-4">
-                <label for="searchName" class="form-label">Buscar por Nombre</label>
-                <input type="text" class="form-control" id="searchName" onkeyup="filterTable()">
-            </div>
-            <div class="col-md-4">
-                <label for="searchRelevance" class="form-label">Relevancia</label>
-                <select class="form-control" id="searchRelevance" onchange="filterTable()">
-                    <option value="">Todos</option>
-                    <option value="1">Relevantes</option>
-                    <option value="0">No Relevantes</option>
-                </select>
-            </div>
-        </div>
-    </form>
+
+
 
     <!-- Tabla de Temarios -->
     <table id="syllabusTable" class="table table-striped display compact">
@@ -74,7 +59,7 @@ include('header.php');
                     </td>
                     <td>
                         <button class="btn btn-sm btn-primary"
-                            onclick="copyToClipboard('<?= htmlspecialchars($product['syllabus']) ?>', '<?= htmlspecialchars($product['name']) ?>')">
+                            onclick="copyToClipboard(`<?= htmlspecialchars_decode($product['syllabus'], ENT_QUOTES) ?>`, '<?= htmlspecialchars($product['name']) ?>')">
                             Copiar
                         </button>
                     </td>
@@ -99,7 +84,7 @@ include('header.php');
                             <div id="<?= $relatedId ?>" style="display: none; margin-top: 5px;">
                                 <?php foreach ($related_products as $related): ?>
                                     <button class="btn btn-sm btn-outline-primary"
-                                        onclick="copyToClipboard('<?= htmlspecialchars($related['syllabus']) ?>', '<?= htmlspecialchars($related['name']) ?>')">
+                                        onclick="copyToClipboard(`<?= htmlspecialchars_decode($related['syllabus'], ENT_QUOTES) ?>`, '<?= htmlspecialchars($related['name']) ?>')">
                                         <?= htmlspecialchars($related['name']) ?>
                                     </button><br>
                                 <?php endforeach; ?>
@@ -108,6 +93,7 @@ include('header.php');
                             echo 'No relacionados';
                         } ?>
                     </td>
+
 
                 </tr>
             <?php endforeach; ?>
@@ -123,24 +109,20 @@ include('header.php');
             return;
         }
 
-        navigator.clipboard.writeText(text).then(() => {
-            alert("Temario de " + productName + " copiado al portapapeles.");
-        }).catch(err => {
-            console.error("Error al copiar: ", err);
-        });
+        // Crear un elemento de texto temporal para copiar el contenido con formato correcto
+        let tempTextarea = document.createElement("textarea");
+        tempTextarea.style.position = "fixed";
+        tempTextarea.style.opacity = "0";
+        tempTextarea.value = text;
+
+        document.body.appendChild(tempTextarea);
+        tempTextarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(tempTextarea);
+
+        alert("Temario de " + productName + " copiado al portapapeles.");
     }
 
-    function toggleExpand(element) {
-        if (element.style.whiteSpace === "normal") {
-            element.style.whiteSpace = "nowrap";
-            element.style.overflow = "hidden";
-            element.style.textOverflow = "ellipsis";
-            element.style.maxWidth = "200px";
-        } else {
-            element.style.whiteSpace = "normal";
-            element.style.maxWidth = "none";
-        }
-    }
 
     function toggleRelatedProducts(relatedId, button) {
         let relatedDiv = document.getElementById(relatedId);
@@ -153,42 +135,36 @@ include('header.php');
             button.innerHTML = "▼"; // Cambia a flecha hacia abajo
         }
     }
-    function filterTable() {
-        let inputName = document.getElementById("searchName").value.toLowerCase();
-        let inputRelevance = document.getElementById("searchRelevance").value;
-        let table = document.getElementById("syllabusTable");
-        let tr = table.getElementsByTagName("tr");
 
-        for (let i = 1; i < tr.length; i++) {
-            let tdName = tr[i].getElementsByTagName("td")[2];
-            let tdRelevance = tr[i].getElementsByTagName("td")[1];
 
-            if (tdName && tdRelevance) {
-                let name = tdName.textContent.toLowerCase();
-                let relevance = tdRelevance.textContent.includes("Sí") ? "1" : "0";
-
-                if (
-                    (name.includes(inputName) || inputName === "") &&
-                    (relevance === inputRelevance || inputRelevance === "")
-                ) {
-                    tr[i].style.display = "";
-                } else {
-                    tr[i].style.display = "none";
-                }
-            }
-        }
-    }
 
     $(document).ready(function () {
         $('#syllabusTable').DataTable({
             paging: true,
-            searching: false,
+            searching: true,  // ✔ Habilita la barra de búsqueda
             ordering: true,
             language: {
                 url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
+            },
+            initComplete: function () {
+                // Mueve el buscador a la parte superior izquierda
+                $('#syllabusTable_filter').css({
+                    'text-align': 'left',
+                    'float': 'none',
+                    'margin': '0'
+                });
+
+                // Mueve "Mostrar n registros" a la parte superior derecha
+                $('#syllabusTable_length').css({
+                    'text-align': 'right',
+                    'float': 'right',
+                    'margin': '0'
+                });
             }
         });
     });
+
+
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
