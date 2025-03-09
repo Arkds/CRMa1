@@ -56,14 +56,18 @@ if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$name, $price, $description, $syllabus, $relevance]);
         $product_id = $pdo->lastInsertId();
 
-        foreach ($related_products as $related_id) {
-            $pdo->prepare("INSERT INTO product_relations (product_id, related_product_id) VALUES (?, ?)")
-                ->execute([$product_id, $related_id]);
+        if (!empty($related_products)) {
+            foreach ($related_products as $related_id) {
+                $pdo->prepare("INSERT INTO product_relations (product_id, related_product_id) VALUES (?, ?)")
+                    ->execute([$id, $related_id]);
+            }
         }
+
     }
 
-    echo json_encode(['success' => true]);
+    echo json_encode(['success' => true, 'message' => 'Producto actualizado correctamente']);
     exit;
+
 }
 
 
@@ -270,9 +274,22 @@ include('header.php')
             let formData = $(this).serialize();
 
             $.post('product_crud.php?action=save', formData, function (response) {
-                location.reload();
+                try {
+                    let result = JSON.parse(response);
+                    if (result.success) {
+                        location.reload(); // ✅ Recarga la página si la actualización fue exitosa
+                    } else {
+                        alert(result.message || "Hubo un error al guardar los cambios.");
+                    }
+                } catch (e) {
+                    alert("Error en la respuesta del servidor.");
+                }
+            }).fail(function () {
+                alert("Error en la conexión con el servidor.");
             });
         });
+
+
         document.addEventListener('DOMContentLoaded', function () {
             let selectedProducts = [];
 
@@ -335,10 +352,13 @@ include('header.php')
                             $('#syllabus').val(product.syllabus);
                             $('#relevance').prop('checked', product.relevance == 1);
 
-                            selectedProducts = product.related_products.map(id => {
-                                let name = $('#productList option[data-id="' + id + '"]').val();
-                                return { id, name };
-                            });
+                            selectedProducts = product.related_products.length > 0
+                                ? product.related_products.map(id => {
+                                    let name = $('#productList option[data-id="' + id + '"]').val();
+                                    return name ? { id, name } : null;
+                                }).filter(p => p !== null)
+                                : [];
+
 
                             updateSelectedProducts();
                             $('#productModal').modal('show');
