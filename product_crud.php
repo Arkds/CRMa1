@@ -48,7 +48,6 @@ if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $pdo->prepare("UPDATE products SET name = ?, price = ?, description = ?, syllabus = ?, relevance = ? WHERE id = ?");
         $stmt->execute([$name, $price, $description, $syllabus, $relevance, $id]);
 
-        // Actualizar relaciones de productos
         $pdo->prepare("DELETE FROM product_relations WHERE product_id = ?")->execute([$id]);
 
         foreach ($related_products as $related_id) {
@@ -172,7 +171,6 @@ include('header.php')
 
 
     <!-- Modal para Agregar/Editar Productos -->
-    <!-- Modal para Agregar/Editar Productos -->
     <div class="modal fade" id="productModal" tabindex="-1" aria-labelledby="productModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -280,7 +278,6 @@ include('header.php')
         document.addEventListener('DOMContentLoaded', function () {
             let selectedProducts = [];
 
-            // Agregar producto relacionado al escribir en el input
             document.getElementById('related_products_input').addEventListener('change', function () {
                 let input = this;
                 let datalist = document.getElementById('productList').options;
@@ -301,7 +298,6 @@ include('header.php')
                 }
             });
 
-            // Mostrar productos seleccionados
             function updateSelectedProducts() {
                 let container = document.getElementById('selectedProducts');
                 container.innerHTML = '';

@@ -1,7 +1,6 @@
 <?php
 require 'db.php';
 
-// Verificar si la cookie de sesión existe
 if (isset($_COOKIE['user_session'])) {
     $user_data = json_decode(base64_decode($_COOKIE['user_session']), true);
 
@@ -18,7 +17,6 @@ if (isset($_COOKIE['user_session'])) {
     exit;
 }
 
-// Obtener todos los productos con sus temarios
 $query = "SELECT * FROM products ORDER BY relevance DESC, name ASC";
 $products = $pdo->query($query)->fetchAll(PDO::FETCH_ASSOC);
 
@@ -29,10 +27,6 @@ include('header.php');
     <h1 class="text-center">Gestión de Temarios</h1>
     <button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>
 
-
-
-
-    <!-- Tabla de Temarios -->
     <table id="syllabusTable" class="table table-striped display compact">
         <thead>
             <tr>
@@ -75,7 +69,6 @@ include('header.php');
                         $related_products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                         if ($related_products) {
-                            // ID único para la sección de productos relacionados
                             $relatedId = "related-" . $product['id'];
                             ?>
                             <button class="btn btn-sm btn-light" onclick="toggleRelatedProducts('<?= $relatedId ?>', this)">

@@ -14,26 +14,48 @@
     <script src="src/chartplugin.js"></script>
 
     <title>CRM</title>
+
+    <style>
+        /* Efecto hover para los botones del navbar */
+        .navbar-nav .nav-link {
+            transition: background 0.3s ease-in-out;
+        }
+
+        .navbar-nav .nav-link:hover {
+            background: rgba(255, 255, 255, 0.53); /* Fondo sutil al pasar el mouse */
+        }
+
+        /* Resaltar el botón activo */
+        .navbar-nav .nav-link.active {
+            background: rgba(255, 255, 255, 0.2);
+            font-weight: bold;
+        }
+
+        /* Espaciado entre elementos */
+        .navbar-nav {
+            gap: 10px;
+        }
+    </style>
 </head>
 
 <body>
 
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-md navbar-dark bg-dark"> <!-- Cambié expand-lg a expand-md -->
         <div class="container-fluid">
 
             <!-- Flecha de volver y botón de inicio (casita) -->
-            <div class="d-flex align-items-center">
-                <button class="nav-link btn btn-link text-white mx-2" onclick="window.history.back();">
+            <div class="d-flex align-items-center gap-3">
+                <button class="nav-link btn btn-link text-white" onclick="window.history.back();">
                     <i class="bi bi-arrow-left"></i>
                 </button>
 
-                <a class="navbar-brand mx-2" href="index.php">
+                <a class="navbar-brand" href="index.php">
                     <i class="bi bi-house"></i>
                 </a>
             </div>
 
-
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+            <!-- Toggler que aparece SOLO en pantallas pequeñas -->
+            <button class="navbar-toggler d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
                 aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
@@ -113,6 +135,14 @@
 
             document.getElementById('liveAlertBtn').addEventListener('click', () => {
                 const message = `<?php echo isset($helpMessage) ? $helpMessage : 'No hay instrucciones disponibles para esta página.'; ?>`;
+            });
+
+            // Resaltar el botón activo
+            const currentUrl = window.location.href;
+            document.querySelectorAll(".navbar-nav button, .navbar-nav a").forEach(link => {
+                if (link.onclick && link.onclick.toString().includes(currentUrl)) {
+                    link.classList.add("active");
+                }
             });
         });
     </script>
