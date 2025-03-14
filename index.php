@@ -127,7 +127,7 @@ include('header.php')
 
 <div class="container mt-5">
     <div id="liveAlertPlaceholder"></div>
-    <button type="button" class="btn btn-outline-dark float-end" id="liveAlertBtn">Ayuda</button>
+<!--    <button type="button" class="btn btn-outline-dark float-end" id="liveAlertBtn">Ayuda</button>-->
 
     <script>
         const alertPlaceholder = document.getElementById('liveAlertPlaceholder')
@@ -166,13 +166,12 @@ include('header.php')
         }
     </script>
     <div class="container">
-        <button class="btn btn-outline-danger" onclick="window.location.href='logout.php';">Cerrar Sesión</button>
+        <!--<button class="btn btn-outline-danger" onclick="window.location.href='logout.php';">Cerrar Sesión</button>-->
 
         <h1 class="text-center">Bienvenido(a), <?= htmlspecialchars($username) ?> 👋</h1>
         <hr>
     </div>
-
-    <!-- Botones de navegación -->
+    <!-- Botones de navegación 
     <div class="d-flex flex-wrap gap-2 justify-content-center justify-content-md-between mb-3">
         <?php if ($isAdmin): ?>
             <a href="user_crud.php" class="btn btn-primary d-flex align-items-center">
@@ -192,9 +191,13 @@ include('header.php')
             </ul>
         </div>
 
-        <button class="btn btn-info d-flex align-items-center" onclick="window.location.href='report_sales.php';">
+        <?php if ($isAdmin): ?>
+            <button class="btn btn-info d-flex align-items-center" onclick="window.location.href='report_sales.php';">
             <i class="bi bi-bar-chart-line me-2"></i> Reportes Ventas
         </button>
+        <?php endif; ?>
+
+        
 
         <button class="btn btn-success d-flex align-items-center" onclick="window.location.href='sales_crud.php';">
             <i class="bi bi-cash-stack me-2"></i> Registrar Ventas
@@ -211,7 +214,7 @@ include('header.php')
         <button class="btn btn-dark d-flex align-items-center" onclick="window.location.href='tracin_crud.php';">
             <i class="bi bi-journal-check me-2"></i> Seguimientos
         </button>
-    </div>
+    </div>-->
     <script>
         function openDropdown(element) {
             let dropdownMenu = element.querySelector('.dropdown-menu');
