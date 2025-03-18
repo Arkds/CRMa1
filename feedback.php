@@ -170,7 +170,6 @@ $hasSubmitted = $stmt->fetchColumn() > 0;
             });
         }
 
-        // Llamar a la función para cada grupo de radio buttons
         toggleField("has_problem", "problemDescriptionContainer");
         toggleField("used_similar", "similarSystemContainer");
         toggleField("used_help", "helpFeedbackContainer");
@@ -193,7 +192,6 @@ $hasSubmitted = $stmt->fetchColumn() > 0;
                 });
         });
 
-        // Enviar el formulario de sugerencias rápidas
         document.getElementById("quickFeedbackForm")?.addEventListener("submit", function (e) {
             e.preventDefault();
             fetch("feedback_process.php", {
