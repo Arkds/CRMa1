@@ -62,49 +62,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 if (!$isAdmin) {
-    $stmt = $pdo->prepare("SELECT shift FROM user_shifts WHERE user_id = ?");
-    $stmt->execute([$user_id]);
-    $user_shifts = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
-    $currentTime = date("H:i:s");
-
-    $timeConditions = [];
-    $latestShiftEnd = "00:00:00"; 
-
-    foreach ($user_shifts as $shift) {
-        switch ($shift) {
-            case 'mañana':
-                $timeConditions[] = "(TIME(created_at) BETWEEN '08:00:00' AND '13:59:59')";
-                $latestShiftEnd = max($latestShiftEnd, '13:59:59');
-                break;
-            case 'tarde':
-                $timeConditions[] = "(TIME(created_at) BETWEEN '14:00:00' AND '19:59:59')";
-                $latestShiftEnd = max($latestShiftEnd, '19:59:59');
-                break;
-            case 'noche_1':
-                $timeConditions[] = "(TIME(created_at) BETWEEN '17:00:00' AND '22:59:59')";
-                $latestShiftEnd = max($latestShiftEnd, '22:59:59');
-                break;
-            case 'noche_2':
-                $timeConditions[] = "(TIME(created_at) BETWEEN '20:00:00' AND '22:59:59')";
-                $latestShiftEnd = max($latestShiftEnd, '22:59:59');
-                break;
-        }
-    }
-
-    if (!empty($timeConditions) && $currentTime <= $latestShiftEnd) {
-        $timeFilter = "AND (" . implode(" OR ", $timeConditions) . ")";
-    } else {
-        $timeFilter = "AND 1=0"; 
-    }
-
-    $salesQuery = "SELECT * FROM sales WHERE user_id = ? AND DATE(created_at) = CURDATE() $timeFilter ORDER BY created_at DESC";
+    // Obtener solo las ventas del usuario en el día actual
+    $salesQuery = "SELECT * FROM sales WHERE user_id = ? AND DATE(created_at) = CURDATE() ORDER BY created_at DESC";
     $stmt = $pdo->prepare($salesQuery);
     $stmt->execute([$user_id]);
 } else {
-    $salesQuery = "SELECT s.*, u.username FROM sales s JOIN users u ON s.user_id = u.id ORDER BY created_at DESC";
+    // Obtener todas las ventas del día actual para los administradores
+    $salesQuery = "SELECT s.*, u.username FROM sales s JOIN users u ON s.user_id = u.id WHERE DATE(s.created_at) = CURDATE() ORDER BY s.created_at DESC";
     $stmt = $pdo->query($salesQuery);
 }
+
 
 $sales = $stmt->fetchAll();
 

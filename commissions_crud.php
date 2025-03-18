@@ -209,7 +209,7 @@ include('header.php')
         </div>
     <?php endif; ?>
 
-    <table class="table table-striped" id="table1">
+    <table class="table table-sm table-striped display compact" id="table1">
         <thead>
             <tr>
                 <th>ID</th>

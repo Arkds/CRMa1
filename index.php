@@ -127,7 +127,7 @@ include('header.php')
 
 <div class="container mt-5">
     <div id="liveAlertPlaceholder"></div>
-<!--    <button type="button" class="btn btn-outline-dark float-end" id="liveAlertBtn">Ayuda</button>-->
+    <!--    <button type="button" class="btn btn-outline-dark float-end" id="liveAlertBtn">Ayuda</button>-->
 
     <script>
         const alertPlaceholder = document.getElementById('liveAlertPlaceholder')
@@ -297,32 +297,40 @@ include('header.php')
                     <canvas id="clientsChart"></canvas>
                 </section>
             </div>
-            <div class="col-md-6">
-                <section class="card p-3">
-                    <h2 class="text-center">Cantidad de Productos Vendidos por Día</h2>
-                    <canvas id="salesChart"></canvas>
-                    <div class="mt-3 text-center">
-                        <button id="prevBtn" class="btn btn-primary">← 30 días anteriores</button>
-                        <button id="nextBtn" class="btn btn-primary" disabled>30 días siguientes →</button>
-                    </div>
-                </section>
-            </div>
-            <div class="col-md-6">
-                <section class="card p-3">
-                    <h2 class="text-center">Cursos más vendidos según reportes</h2>
-                    <canvas id="wordsChart"></canvas>
-                </section>
-            </div>
+            <?php if ($isAdmin): ?>
+                <div class="col-md-6">
+                    <section class="card p-3">
+                        <h2 class="text-center">Cantidad de Productos Vendidos por Día</h2>
+                        <canvas id="salesChart"></canvas>
+                        <div class="mt-3 text-center">
+                            <button id="prevBtn" class="btn btn-primary">← 30 días anteriores</button>
+                            <button id="nextBtn" class="btn btn-primary" disabled>30 días siguientes →</button>
+                        </div>
+                    </section>
+                </div>
+            <?php endif; ?>
+
+            <?php if ($isAdmin): ?>
+                <div class="col-md-6">
+                    <section class="card p-3">
+                        <h2 class="text-center">Cursos más vendidos según reportes</h2>
+                        <canvas id="wordsChart"></canvas>
+                    </section>
+                </div>
+            <?php endif; ?>
+
 
 
         </div>
     </div>
     <br>
-    <section class="card p-3">
-        <h2>Productos Más Vendidos</h2>
-        <canvas id="productsChart"></canvas>
+    <?php if ($isAdmin): ?>
+        <section class="card p-3">
+            <h2>Productos Más Vendidos</h2>
+            <canvas id="productsChart"></canvas>
+        </section>
+    <?php endif; ?>
 
-    </section>
 
 
 </div>
@@ -334,7 +342,7 @@ include('header.php')
                 paging: true,
                 searching: true,
                 ordering: true,
-                order: [[5, 'desc']], // Asegúrate de que el índice 6 corresponda a la columna de fecha
+                order: [[5, 'desc']], 
                 language: {
                     url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
                 }
