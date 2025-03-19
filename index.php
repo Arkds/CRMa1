@@ -662,12 +662,6 @@ include('header.php')
         });
     });
 </script>
-<?php
-$stmt = $pdo->query("SELECT name, price, description FROM products WHERE relevance = 1");
-$products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-echo json_encode($products);
-?>
 <script>
     $(document).ready(function () {
         $('#relevantProductsTable').DataTable({
