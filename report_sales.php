@@ -157,7 +157,7 @@ include('header.php')
             <p><strong>Total de Productos Vendidos:</strong> <?= $totalQuantity ?></p>
         
             <?php if ($isAdmin): ?>
-                <p><strong>Monto Total:</strong> S/ <?= number_format($totalAmount, 2) ?></p>
+                <p><strong>Monto Total:</strong> $ <?= number_format($totalAmount, 2) ?></p>
             <?php endif; ?>
         </div>
 
