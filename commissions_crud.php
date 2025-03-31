@@ -1,11 +1,36 @@
 <?php
 require 'db.php';
 
+
 // Verificar sesión
 if (!isset($_COOKIE['user_session'])) {
     header("Location: login.php");
     exit;
 }
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_check'])) {
+    header("Content-Type: application/json");
+
+    $operation_number = $_POST['operation_number'] ?? '';
+    $commission_id = $_POST['commission_id'] ?? null;
+
+    if (empty($operation_number)) {
+        echo json_encode(['exists' => false]);
+        exit;
+    }
+
+    if ($commission_id) {
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM commissions WHERE operation_number = ? AND id != ?");
+        $stmt->execute([$operation_number, $commission_id]);
+    } else {
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM commissions WHERE operation_number = ?");
+        $stmt->execute([$operation_number]);
+    }
+
+    $exists = $stmt->fetchColumn() > 0;
+    echo json_encode(['exists' => $exists]);
+    exit;
+}
+
 
 // Decodificar cookie
 $user_data = json_decode(base64_decode($_COOKIE['user_session']), true);
@@ -319,9 +344,19 @@ include('header.php')
             </div>
             <div class="modal-body">
                 <form method="POST">
-                    <input type="hidden" id="commission_id" name="commission_id">
                     <div class="mb-3">
-                        <label for="product_name" class="form-label"><strong>Producto</strgon></label>
+                    <label for="operation_number" class="form-label"><strong>Numero de Operación</strong></label>
+                    <input type="text" id="operation_number" name="operation_number" class="form-control" required>
+                        <div class="invalid-feedback" id="op-feedback">
+                            Este número de operación ya ha sido registrado.
+                        </div>
+
+                    </div>
+                    <hr>
+                    <input type="hidden" id="commission_id" name="commission_id">
+
+                    <div class="mb-3">
+                        <label for="product_name" class="form-label">Producto</label>
                         <input type="text" id="product_name" name="product_name" class="form-control" required>
                     </div>
                     <hr>
@@ -343,11 +378,8 @@ include('header.php')
                         </datalist>
                     </div>
                     <hr>
-                    <div class="mb-3">
-                        <label for="operation_number" class="form-label">Número de Operación</label>
-                        <input type="text" id="operation_number" name="operation_number" class="form-control" required>
-                    </div>
-                    <hr>
+
+            
                     <div class="mb-3">
                         <label for="link" class="form-label">Comprobantes (Enlaces de Google Drive)</label>
                         <div id="comprobantesContainer">
@@ -434,7 +466,7 @@ include('header.php')
             paging: true,
             searching: true,
             ordering: true,
-            order: [[6, 'desc']],
+            order: [[0, 'desc']],
             language: {
                 url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
             }
@@ -472,3 +504,42 @@ include('header.php')
 </body>
 
 </html>
+<script>
+    const opInput = document.getElementById('operation_number');
+    const opFeedback = document.getElementById('op-feedback');
+    const commissionIdInput = document.getElementById('commission_id');
+    const form = document.querySelector('#commissionModal form');
+
+    opInput.addEventListener('input', () => {
+        const operation_number = opInput.value.trim();
+        const commission_id = commissionIdInput.value;
+
+        if (operation_number.length < 3) {
+            opInput.classList.remove('is-invalid', 'is-valid');
+            return;
+        }
+
+        fetch('commissions_crud.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `ajax_check=1&operation_number=${encodeURIComponent(operation_number)}&commission_id=${encodeURIComponent(commission_id)}`
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.exists) {
+                    opInput.classList.add('is-invalid');
+                    opInput.classList.remove('is-valid');
+                } else {
+                    opInput.classList.remove('is-invalid');
+                    opInput.classList.add('is-valid');
+                }
+            });
+    });
+
+    form.addEventListener('submit', function (e) {
+        if (opInput.classList.contains('is-invalid')) {
+            e.preventDefault();
+            opInput.focus();
+        }
+    });
+</script>
