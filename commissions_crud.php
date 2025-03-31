@@ -11,27 +11,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_check'])) {
     header("Content-Type: application/json");
 
     $operation_number = $_POST['operation_number'] ?? '';
+    $client_email = $_POST['client_email'] ?? '';
+    $voucher_datetime = $_POST['voucher_datetime'] ?? '';
     $commission_id = $_POST['commission_id'] ?? null;
 
-    if (empty($operation_number)) {
-        echo json_encode(['exists' => false]);
-        exit;
+    // Verificar las 3 posibles combinaciones de 2 campos
+    $combinations = [
+        ['operation_number', 'client_email'],
+        ['operation_number', 'voucher_datetime'],
+        ['client_email', 'voucher_datetime']
+    ];
+
+    $results = [];
+    $matchedFields = [];
+
+    foreach ($combinations as $combo) {
+        $field1 = $combo[0];
+        $field2 = $combo[1];
+
+        $value1 = $$field1;
+        $value2 = $$field2;
+
+        // Solo verificamos si ambos campos tienen valores
+        if (!empty($value1) && !empty($value2)) {
+            $sql = "SELECT COUNT(*) FROM commissions WHERE $field1 = ? AND $field2 = ?";
+            $params = [$value1, $value2];
+
+            if ($commission_id) {
+                $sql .= " AND id != ?";
+                $params[] = $commission_id;
+            }
+
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $count = $stmt->fetchColumn();
+
+            if ($count > 0) {
+                $results[] = $combo;
+                $matchedFields = array_merge($matchedFields, $combo);
+            }
+        }
     }
 
-    if ($commission_id) {
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM commissions WHERE operation_number = ? AND id != ?");
-        $stmt->execute([$operation_number, $commission_id]);
-    } else {
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM commissions WHERE operation_number = ?");
-        $stmt->execute([$operation_number]);
-    }
+    $exists = !empty($results);
+    $matchedFields = array_unique($matchedFields);
 
-    $exists = $stmt->fetchColumn() > 0;
-    echo json_encode(['exists' => $exists]);
+    echo json_encode([
+        'exists' => $exists,
+        'matchedFields' => $matchedFields,
+        'conflicts' => $results
+    ]);
     exit;
 }
-
-
 // Decodificar cookie
 $user_data = json_decode(base64_decode($_COOKIE['user_session']), true);
 $user_id = $user_data['user_id'];
@@ -93,8 +124,6 @@ if ($commission_id) {
     }
 }
 
-
-// Registrar o Editar Comisión
 // Registrar o Editar Comisión
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Capturar valores del formulario
@@ -106,6 +135,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $links = $_POST['links'] ?? []; // Se asegura de obtener un array vacío si no hay enlaces
     $commission_id = $_POST['commission_id'] ?? null;
+    $client_email = $_POST['client_email'] ?? null;
+    $voucher_datetime = $_POST['voucher_datetime'] ?? null;
+    if ($voucher_datetime) {
+        // Asegurarse de que solo se guarde la fecha (opcional)
+        $voucher_datetime = date('Y-m-d', strtotime($voucher_datetime));
+    }
+
 
     // Verificar que los campos requeridos no sean nulos
     if (empty($product_name) || empty($price) || empty($channel) || empty($operation_number)) {
@@ -130,8 +166,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         setcookie('success_message', "¡Comisión actualizada correctamente!", time() + 5, "/");
     } else {
         // Insertar nueva comisión
-        $stmt = $pdo->prepare("INSERT INTO commissions (product_name, price, channel, operation_number, description, user_id) VALUES (?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$product_name, $price, $channel, $operation_number, $description, $user_id]);
+        $stmt = $pdo->prepare("INSERT INTO commissions (product_name, price, channel, operation_number, description, user_id, client_email, voucher_datetime) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$product_name, $price, $channel, $operation_number, $description, $user_id, $client_email, $voucher_datetime]);
+
 
         $commission_id = $pdo->lastInsertId(); // Obtener el ID de la nueva comisión
 
@@ -242,15 +279,17 @@ include('header.php')
                 <th>Precio</th>
                 <th>Canal</th>
                 <th>Número de Operación</th>
+                <th>Correo Cliente</th>
+                <th>Fecha/Hora Comprobante</th>
                 <th>Comprobante</th>
                 <th>Descripción</th>
                 <th>Usuario</th>
                 <th>Procesado</th>
                 <th>Fecha</th>
                 <th>Acciones</th>
-
             </tr>
         </thead>
+
         <tbody>
             <?php foreach ($commissions as $commission): ?>
                 <tr>
@@ -259,6 +298,9 @@ include('header.php')
                     <td><?= htmlspecialchars($commission['price']) ?></td>
                     <td><?= htmlspecialchars($commission['channel']) ?></td>
                     <td><?= htmlspecialchars($commission['operation_number']) ?></td>
+                    <td><?= htmlspecialchars($commission['client_email']) ?></td>
+                    <td><?= htmlspecialchars($commission['voucher_datetime']) ?></td>
+
 
                     <td>
                         <?php
@@ -318,7 +360,9 @@ include('header.php')
         "<?= htmlspecialchars($commission['channel'], ENT_QUOTES) ?>",
         "<?= htmlspecialchars($commission['operation_number'], ENT_QUOTES) ?>",
         "<?= isset($commission['description']) ? htmlspecialchars($commission['description'], ENT_QUOTES) : '' ?>",
-        <?= json_encode($comprobantes, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>
+        <?= json_encode($comprobantes, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>,
+        "<?= isset($commission['client_email']) ? htmlspecialchars($commission['client_email'], ENT_QUOTES) : '' ?>",
+        "<?= isset($commission['voucher_datetime']) ? htmlspecialchars($commission['voucher_datetime'], ENT_QUOTES) : '' ?>"
     )'>
                             Editar
                         </button>
@@ -344,13 +388,23 @@ include('header.php')
             </div>
             <div class="modal-body">
                 <form method="POST">
+                    <!-- En tu modal, asegúrate de tener estos campos -->
                     <div class="mb-3">
-                    <label for="operation_number" class="form-label"><strong>Numero de Operación</strong></label>
-                    <input type="text" id="operation_number" name="operation_number" class="form-control" required>
-                        <div class="invalid-feedback" id="op-feedback">
-                            Este número de operación ya ha sido registrado.
-                        </div>
+                        <label for="operation_number" class="form-label"><strong>Número de Operación</strong></label>
+                        <input type="text" id="operation_number" name="operation_number" class="form-control" required>
+                        <div class="invalid-feedback" id="op-feedback"></div>
+                    </div>
 
+                    <div class="mb-3">
+                        <label for="client_email" class="form-label">Correo del Cliente</label>
+                        <input type="email" id="client_email" name="client_email" class="form-control" required>
+                        <div class="invalid-feedback"></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="voucher_datetime" class="form-label">Fecha del Comprobante</label>
+                        <input type="date" id="voucher_datetime" name="voucher_datetime" class="form-control" required>
+                        <div class="invalid-feedback"></div>
                     </div>
                     <hr>
                     <input type="hidden" id="commission_id" name="commission_id">
@@ -379,7 +433,7 @@ include('header.php')
                     </div>
                     <hr>
 
-            
+
                     <div class="mb-3">
                         <label for="link" class="form-label">Comprobantes (Enlaces de Google Drive)</label>
                         <div id="comprobantesContainer">
@@ -397,6 +451,7 @@ include('header.php')
                     </div>
 
 
+
                     <button type="submit" class="btn btn-success w-100">Guardar Comisión</button>
                 </form>
             </div>
@@ -404,15 +459,24 @@ include('header.php')
     </div>
 </div>
 <script>
-    function editCommission(id, productName, price, channel, operationNumber, description, links) {
+    function editCommission(id, productName, price, channel, operationNumber, description, links, clientEmail, voucherDatetime) {
         document.getElementById("commission_id").value = id;
         document.getElementById("product_name").value = productName;
         document.getElementById("price").value = price;
         document.getElementById("channel").value = channel;
         document.getElementById("operation_number").value = operationNumber;
-
-        // Si la descripción es NULL, asignamos un string vacío
         document.getElementById("description").value = description && description !== "null" ? description : "";
+        document.getElementById("client_email").value = clientEmail || "";
+
+        // Formatear la fecha/hora para el input datetime-local
+        // Formatear la fecha para el input date (solo fecha)
+        if (voucherDatetime) {
+            let date = new Date(voucherDatetime);
+            let formattedDate = date.toISOString().split('T')[0];
+            document.getElementById("voucher_datetime").value = formattedDate;
+        } else {
+            document.getElementById("voucher_datetime").value = "";
+        }
 
         document.querySelector("#commissionModal .modal-title").textContent = "Editar Comisión";
 
@@ -506,40 +570,120 @@ include('header.php')
 </html>
 <script>
     const opInput = document.getElementById('operation_number');
+    const emailInput = document.getElementById('client_email');
+    const dateInput = document.getElementById('voucher_datetime');
     const opFeedback = document.getElementById('op-feedback');
+    const emailFeedback = document.querySelector('#client_email + .invalid-feedback');
+    const dateFeedback = document.querySelector('#voucher_datetime + .invalid-feedback');
     const commissionIdInput = document.getElementById('commission_id');
     const form = document.querySelector('#commissionModal form');
 
-    opInput.addEventListener('input', () => {
+    function checkCommissionExists() {
         const operation_number = opInput.value.trim();
+        const client_email = emailInput.value.trim();
+        const voucher_datetime = dateInput.value;
         const commission_id = commissionIdInput.value;
 
-        if (operation_number.length < 3) {
-            opInput.classList.remove('is-invalid', 'is-valid');
-            return;
-        }
+        // Resetear estados
+        opInput.classList.remove('is-invalid', 'is-valid');
+        emailInput.classList.remove('is-invalid', 'is-valid');
+        dateInput.classList.remove('is-invalid', 'is-valid');
+        if (opFeedback) opFeedback.style.display = 'none';
+        if (emailFeedback) emailFeedback.style.display = 'none';
+        if (dateFeedback) dateFeedback.style.display = 'none';
+
+        // Verificar si hay al menos 2 campos con datos
+        const filledFields = [
+            operation_number.length >= 3,
+            client_email.length >= 3,
+            voucher_datetime.length >= 3
+        ].filter(Boolean).length;
+
+        if (filledFields < 2) return;
 
         fetch('commissions_crud.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `ajax_check=1&operation_number=${encodeURIComponent(operation_number)}&commission_id=${encodeURIComponent(commission_id)}`
+            body: `ajax_check=1&operation_number=${encodeURIComponent(operation_number)}&client_email=${encodeURIComponent(client_email)}&voucher_datetime=${encodeURIComponent(voucher_datetime)}&commission_id=${encodeURIComponent(commission_id)}`
         })
             .then(res => res.json())
             .then(data => {
                 if (data.exists) {
-                    opInput.classList.add('is-invalid');
-                    opInput.classList.remove('is-valid');
-                } else {
-                    opInput.classList.remove('is-invalid');
-                    opInput.classList.add('is-valid');
-                }
-            });
-    });
+                    const errorMessages = {
 
-    form.addEventListener('submit', function (e) {
-        if (opInput.classList.contains('is-invalid')) {
-            e.preventDefault();
-            opInput.focus();
+                    };
+
+                    // Marcar todos los campos involucrados en los conflictos
+                    data.matchedFields.forEach(field => {
+                        if (field === 'operation_number') {
+                            opInput.classList.add('is-invalid');
+                            if (opFeedback) {
+                                opFeedback.textContent = 'Este número de operación coincide con una fecha o correo ya registrado';
+                                opFeedback.style.display = 'block';
+                            }
+                        }
+                        if (field === 'client_email') {
+                            emailInput.classList.add('is-invalid');
+                            if (emailFeedback) {
+                                emailFeedback.textContent = 'Este correo coincide con un numero de opración o fecha ya registrado';
+                                emailFeedback.style.display = 'block';
+                            }
+                        }
+                        if (field === 'voucher_datetime') {
+                            dateInput.classList.add('is-invalid');
+                            if (dateFeedback) {
+                                dateFeedback.textContent = 'Esta fecha coincide con un numero de opreción o correo ya registrado';
+                                dateFeedback.style.display = 'block';
+                            }
+                        }
+                    });
+
+                    // Mostrar mensaje general con los conflictos específicos
+                    if (data.conflicts && data.conflicts.length > 0) {
+                        const conflictMessages = data.conflicts.map(conflict => {
+                            const key = conflict.join('_');
+                            return errorMessages[key] || `Conflicto en ${conflict.join(' y ')}`;
+                        });
+
+                        const alertPlaceholder = document.getElementById('liveAlertPlaceholder');
+                        if (alertPlaceholder) {
+                            const wrapper = document.createElement('div');
+                            wrapper.innerHTML = [
+                                '<div class="alert alert-warning alert-dismissible fade show" role="alert">',
+                                '   <strong>Ten cuidado al ingresar comisiones ya ingresadas por otro usuario</strong><br>',
+
+                                '   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>',
+                                '</div>'
+                            ].join('');
+                            alertPlaceholder.innerHTML = '';
+                            alertPlaceholder.appendChild(wrapper);
+                        }
+                    }
+                } else {
+                    // Marcar como válidos los campos con datos
+                    if (operation_number.length >= 3) opInput.classList.add('is-valid');
+                    if (client_email.length >= 3) emailInput.classList.add('is-valid');
+                    if (voucher_datetime.length >= 3) dateInput.classList.add('is-valid');
+                }
+            })
+            .catch(error => console.error("Error:", error));
+    }
+
+    // Event listeners para los tres campos
+    [opInput, emailInput, dateInput].forEach(input => {
+        if (input) {
+            input.addEventListener('input', checkCommissionExists);
+            input.addEventListener('change', checkCommissionExists);
         }
     });
+
+    if (form) {
+        form.addEventListener('submit', function (e) {
+            const invalidFields = form.querySelectorAll('.is-invalid');
+            if (invalidFields.length > 0) {
+                e.preventDefault();
+                invalidFields[0].focus();
+            }
+        });
+    }
 </script>
