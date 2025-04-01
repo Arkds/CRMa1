@@ -148,11 +148,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die("Error: Todos los campos son obligatorios.");
     }
 
+    $is_shared = isset($_POST['is_shared']) && $_POST['is_shared'] === 'on';
+    $shared_user_id = $_POST['shared_user'] ?? null;
+
+    // Si es una comisión compartida, agregar al texto de descripción
+    if ($is_shared && $shared_user_id) {
+        $stmt = $pdo->prepare("SELECT username FROM users WHERE id = ?");
+        $stmt->execute([$shared_user_id]);
+        $shared_user = $stmt->fetch();
+
+        $shared_text = "- Comisión compartida con: " . $shared_user['username'];
+
+        // Asegurarse de que el texto no esté ya presente
+        if (strpos($description, $shared_text) === false) {
+            $description = trim($description . "\n" . $shared_text);
+        }
+    } else {
+        $description = preg_replace('/- Comisión compartida con: .*/', '', $description);
+        $description = trim($description);
+    }
     if ($commission_id) {
-        // Capturar la descripción
         $description = $_POST['description'] ?? null;
 
-        // Editar comisión (solo si es dueño del registro o admin)
         $query = $isAdmin
             ? "UPDATE commissions SET product_name=?, price=?, channel=?, operation_number=?, description=? WHERE id=?"
             : "UPDATE commissions SET product_name=?, price=?, channel=?, operation_number=?, description=? WHERE id=? AND user_id=?";
@@ -200,10 +217,14 @@ if (isset($_GET['delete']) && $isAdmin) {
     header('Location: commissions_crud.php');
     exit;
 }
-// Consultar comisiones
+// Consultar comisiones (modificar esta parte)
 $commissionsQuery = $isAdmin
     ? "SELECT c.*, u.username FROM commissions c JOIN users u ON c.user_id = u.id ORDER BY created_at DESC"
-    : "SELECT * FROM commissions WHERE user_id = ? ORDER BY created_at DESC";
+    : "SELECT c.*, u.username 
+       FROM commissions c 
+       JOIN users u ON c.user_id = u.id 
+       WHERE c.user_id = ? OR c.description LIKE '%Comisión compartida con: " . $username . "%'
+       ORDER BY created_at DESC";
 
 $stmt = $pdo->prepare($commissionsQuery);
 $isAdmin ? $stmt->execute() : $stmt->execute([$user_id]);
@@ -388,72 +409,95 @@ include('header.php')
             </div>
             <div class="modal-body">
                 <form method="POST">
-                    <!-- En tu modal, asegúrate de tener estos campos -->
-                    <div class="mb-3">
-                        <label for="operation_number" class="form-label"><strong>Número de Operación</strong></label>
-                        <input type="text" id="operation_number" name="operation_number" class="form-control" required>
-                        <div class="invalid-feedback" id="op-feedback"></div>
-                    </div>
+    <!-- Sección: Información de Comprobante -->
+    <div class="mb-3 border p-3">
+        <h5 class="mb-3"><strong>Información de Comprobante</strong></h5>
+        <div class="mb-3">
+            <label for="operation_number" class="form-label"><strong>Número de Operación</strong></label>
+            <input type="text" id="operation_number" name="operation_number" class="form-control" required>
+            <div class="invalid-feedback" id="op-feedback"></div>
+        </div>
 
-                    <div class="mb-3">
-                        <label for="client_email" class="form-label">Correo del Cliente</label>
-                        <input type="email" id="client_email" name="client_email" class="form-control" required>
-                        <div class="invalid-feedback"></div>
-                    </div>
+        <div class="mb-3">
+            <label for="client_email" class="form-label">Correo del Cliente</label>
+            <input type="email" id="client_email" name="client_email" class="form-control" required>
+            <div class="invalid-feedback"></div>
+        </div>
 
-                    <div class="mb-3">
-                        <label for="voucher_datetime" class="form-label">Fecha del Comprobante</label>
-                        <input type="date" id="voucher_datetime" name="voucher_datetime" class="form-control" required>
-                        <div class="invalid-feedback"></div>
-                    </div>
-                    <hr>
-                    <input type="hidden" id="commission_id" name="commission_id">
+        <div class="mb-3">
+            <label for="voucher_datetime" class="form-label">Fecha del Comprobante</label>
+            <input type="date" id="voucher_datetime" name="voucher_datetime" class="form-control" required>
+            <div class="invalid-feedback"></div>
+        </div>
+        
+        <div class="mb-3">
+            <label for="link" class="form-label">Comprobantes (Enlaces de Google Drive)</label>
+            <div id="comprobantesContainer">
+                <input type="url" name="links[]" class="form-control mb-2" placeholder="Pega el enlace del comprobante">
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="agregarComprobante()">Agregar más enlaces</button>
+        </div>
+        <input type="hidden" id="commission_id" name="commission_id">
+    </div>
 
-                    <div class="mb-3">
-                        <label for="product_name" class="form-label">Producto</label>
-                        <input type="text" id="product_name" name="product_name" class="form-control" required>
-                    </div>
-                    <hr>
-                    <div class="mb-3">
-                        <label for="price" class="form-label">Precio</label>
-                        <input type="number" step="0.01" id="price" name="price" class="form-control" required>
-                    </div>
-                    <hr>
-                    <div class="mb-3">
-                        <label for="channel" class="form-label">Canal</label>
-                        <input id="channel" name="channel" class="form-control" list="canales"
-                            placeholder="Selecciona o escribe un canal" required>
-                        <datalist id="canales">
-                            <option value="WhatsApp Premium">
-                            <option value="WhatsApp Hazla">
-                            <option value="Messenger Tx">
-                            <option value="Messenger Hazla">
-                            <option value="Messenger Premium">
-                        </datalist>
-                    </div>
-                    <hr>
+    <!-- Sección: Información de Producto -->
+    <div class="mb-3 border p-3">
+        <h5 class="mb-3"><strong>Información de Producto</strong></h5>
+        <div class="mb-3">
+            <label for="product_name" class="form-label">Producto</label>
+            <input type="text" id="product_name" name="product_name" class="form-control" required>
+        </div>
 
+        <div class="mb-3">
+            <label for="price" class="form-label">Precio</label>
+            <input type="number" step="0.01" id="price" name="price" class="form-control" required>
+        </div>
 
-                    <div class="mb-3">
-                        <label for="link" class="form-label">Comprobantes (Enlaces de Google Drive)</label>
-                        <div id="comprobantesContainer">
-                            <input type="url" name="links[]" class="form-control mb-2"
-                                placeholder="Pega el enlace del comprobante">
-                        </div>
-                        <hr>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="agregarComprobante()">Agregar
-                            más enlaces</button>
-                    </div>
-                    <div class="mb-3">
-                        <label for="description" class="form-label">Descripción (opcional)</label>
-                        <textarea id="description" name="description" class="form-control" rows="2"
-                            placeholder="Escribe una descripción..."></textarea>
-                    </div>
+        <div class="mb-3">
+            <label for="channel" class="form-label">Canal</label>
+            <input id="channel" name="channel" class="form-control" list="canales" placeholder="Selecciona o escribe un canal" required>
+            <datalist id="canales">
+                <option value="WhatsApp Premium">
+                <option value="WhatsApp Hazla">
+                <option value="Messenger Tx">
+                <option value="Messenger Hazla">
+                <option value="Messenger Premium">
+            </datalist>
+        </div>
+    </div>
 
+    <!-- Sección: Otros -->
+    <div class="mb-3 border p-3">
+        <h5 class="mb-3"><strong>Otros</strong></h5>
+        <div class="mb-3">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="sharedCommission" name="is_shared" onclick="toggleSharedCommission()">
+                <label class="form-check-label" for="sharedCommission">
+                    Comisión compartida
+                </label>
+            </div>
+            <div id="sharedCommissionContainer" style="display: none;" class="mt-2">
+                <label for="sharedUser" class="form-label">Compartir con:</label>
+                <select id="sharedUser" name="shared_user" class="form-select">
+                    <?php
+                    $stmt = $pdo->prepare("SELECT id, username FROM users WHERE id != ?");
+                    $stmt->execute([$user_id]);
+                    $users = $stmt->fetchAll();
+                    foreach ($users as $user): ?>
+                        <option value="<?= $user['id'] ?>"><?= htmlspecialchars($user['username']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        </div>
+        
+        <div class="mb-3">
+            <label for="description" class="form-label">Descripción (opcional)</label>
+            <textarea id="description" name="description" class="form-control" rows="2" placeholder="Escribe una descripción..."></textarea>
+        </div>
+    </div>
 
-
-                    <button type="submit" class="btn btn-success w-100">Guardar Comisión</button>
-                </form>
+    <button type="submit" class="btn btn-success w-100">Guardar Comisión</button>
+</form>
             </div>
         </div>
     </div>
@@ -468,7 +512,6 @@ include('header.php')
         document.getElementById("description").value = description && description !== "null" ? description : "";
         document.getElementById("client_email").value = clientEmail || "";
 
-        // Formatear la fecha/hora para el input datetime-local
         // Formatear la fecha para el input date (solo fecha)
         if (voucherDatetime) {
             let date = new Date(voucherDatetime);
@@ -511,8 +554,35 @@ include('header.php')
             input.placeholder = "Pega el enlace del comprobante";
             container.appendChild(input);
         }
+        const sharedTextMatch = description?.match(/- Comisión compartida con: (.+)/);
+        if (sharedTextMatch) {
+            document.getElementById('sharedCommission').checked = true;
+            document.getElementById('sharedCommissionContainer').style.display = 'block';
+
+            // Separar descripción editable de texto fijo
+            const editableDesc = description.replace(/- Comisión compartida con: .*/g, '').trim();
+            document.getElementById('description').value = editableDesc;
+
+            // Mostrar texto fijo
+            const sharedText = document.createElement('div');
+            sharedText.className = 'shared-text bg-light p-2 mt-2 rounded';
+            sharedText.textContent = "- Comisión compartida con: " + sharedTextMatch[1].trim();
+            sharedText.style.whiteSpace = 'pre-line';
+            document.getElementById('description').insertAdjacentElement('afterend', sharedText);
+
+            // Seleccionar usuario correspondiente
+            const sharedUserSelect = document.getElementById('sharedUser');
+            for (let i = 0; i < sharedUserSelect.options.length; i++) {
+                if (sharedUserSelect.options[i].text === sharedTextMatch[1].trim()) {
+                    sharedUserSelect.selectedIndex = i;
+                    break;
+                }
+            }
+        }
+
     }
 </script>
+
 <script>
     function agregarComprobante() {
         let container = document.getElementById("comprobantesContainer");
@@ -524,6 +594,7 @@ include('header.php')
         container.appendChild(input);
     }
 </script>
+
 <script>
     $(document).ready(function () {
         $('#table1').DataTable({
@@ -686,4 +757,45 @@ include('header.php')
             }
         });
     }
+</script>
+<script>
+    function toggleSharedCommission() {
+        const checkbox = document.getElementById('sharedCommission');
+        const container = document.getElementById('sharedCommissionContainer');
+        const description = document.getElementById('description');
+
+        if (checkbox.checked) {
+            container.style.display = 'block';
+            const sharedUserSelect = document.getElementById('sharedUser');
+            const selectedUserName = sharedUserSelect.options[sharedUserSelect.selectedIndex].text;
+
+            const currentDesc = description.value.replace(/- Comisión compartida con: .*/g, '').trim();
+            description.value = currentDesc;
+
+            const sharedText = document.createElement('div');
+            sharedText.className = 'shared-text bg-light p-2 mt-2 rounded';
+            sharedText.textContent = "- Comisión compartida con: " + selectedUserName;
+            sharedText.style.whiteSpace = 'pre-line';
+
+            description.insertAdjacentElement('afterend', sharedText);
+        } else {
+            container.style.display = 'none';
+            const sharedText = description.nextElementSibling;
+            if (sharedText && sharedText.classList.contains('shared-text')) {
+                sharedText.remove();
+            }
+        }
+    }
+    document.getElementById('sharedUser')?.addEventListener('change', function () {
+        const checkbox = document.getElementById('sharedCommission');
+        if (checkbox.checked) {
+            const description = document.getElementById('description');
+            const selectedUserName = this.options[this.selectedIndex].text;
+            const sharedText = description.nextElementSibling;
+
+            if (sharedText && sharedText.classList.contains('shared-text')) {
+                sharedText.textContent = "- Comisión compartida con: " + selectedUserName;
+            }
+        }
+    });
 </script>
