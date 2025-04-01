@@ -144,9 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 
     // Verificar que los campos requeridos no sean nulos
-    if (empty($product_name) || empty($price) || empty($channel) || empty($operation_number)) {
-        die("Error: Todos los campos son obligatorios.");
-    }
+   
 
     $is_shared = isset($_POST['is_shared']) && $_POST['is_shared'] === 'on';
     $shared_user_id = $_POST['shared_user'] ?? null;
@@ -409,95 +407,104 @@ include('header.php')
             </div>
             <div class="modal-body">
                 <form method="POST">
-    <!-- Sección: Información de Comprobante -->
-    <div class="mb-3 border p-3">
-        <h5 class="mb-3"><strong>Información de Comprobante</strong></h5>
-        <div class="mb-3">
-            <label for="operation_number" class="form-label"><strong>Número de Operación</strong></label>
-            <input type="text" id="operation_number" name="operation_number" class="form-control" required>
-            <div class="invalid-feedback" id="op-feedback"></div>
-        </div>
+                    <!-- Sección: Información de Comprobante -->
+                    <div class="mb-3 border p-3">
+                        <h5 class="mb-3"><strong>Información de Comprobante</strong></h5>
+                        <div class="mb-3">
+                            <label for="operation_number" class="form-label"><strong>Número de
+                                    Operación</strong></label>
+                            <input type="text" id="operation_number" name="operation_number" class="form-control"
+                                required>
+                            <div class="invalid-feedback" id="op-feedback"></div>
+                        </div>
 
-        <div class="mb-3">
-            <label for="client_email" class="form-label">Correo del Cliente</label>
-            <input type="email" id="client_email" name="client_email" class="form-control" required>
-            <div class="invalid-feedback"></div>
-        </div>
+                        <div class="mb-3">
+                            <label for="client_email" class="form-label">Correo del Cliente</label>
+                            <input type="email" id="client_email" name="client_email" class="form-control" required>
+                            <div class="invalid-feedback"></div>
+                        </div>
 
-        <div class="mb-3">
-            <label for="voucher_datetime" class="form-label">Fecha del Comprobante</label>
-            <input type="date" id="voucher_datetime" name="voucher_datetime" class="form-control" required>
-            <div class="invalid-feedback"></div>
-        </div>
-        
-        <div class="mb-3">
-            <label for="link" class="form-label">Comprobantes (Enlaces de Google Drive)</label>
-            <div id="comprobantesContainer">
-                <input type="url" name="links[]" class="form-control mb-2" placeholder="Pega el enlace del comprobante">
-            </div>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="agregarComprobante()">Agregar más enlaces</button>
-        </div>
-        <input type="hidden" id="commission_id" name="commission_id">
-    </div>
+                        <div class="mb-3">
+                            <label for="voucher_datetime" class="form-label">Fecha del Comprobante</label>
+                            <input type="date" id="voucher_datetime" name="voucher_datetime" class="form-control"
+                                required>
+                            <div class="invalid-feedback"></div>
+                        </div>
 
-    <!-- Sección: Información de Producto -->
-    <div class="mb-3 border p-3">
-        <h5 class="mb-3"><strong>Información de Producto</strong></h5>
-        <div class="mb-3">
-            <label for="product_name" class="form-label">Producto</label>
-            <input type="text" id="product_name" name="product_name" class="form-control" required>
-        </div>
+                        <div class="mb-3">
+                            <label for="link" class="form-label">Comprobantes (Enlaces de Google Drive)</label>
+                            <div id="comprobantesContainer">
+                                <input type="url" name="links[]" class="form-control mb-2"
+                                    placeholder="Pega el enlace del comprobante">
+                            </div>
+                            <button type="button" class="btn btn-secondary btn-sm"
+                                onclick="agregarComprobante()">Agregar más enlaces</button>
+                        </div>
+                        <input type="hidden" id="commission_id" name="commission_id">
+                    </div>
 
-        <div class="mb-3">
-            <label for="price" class="form-label">Precio</label>
-            <input type="number" step="0.01" id="price" name="price" class="form-control" required>
-        </div>
+                    <!-- Sección: Información de Producto -->
+                    <div class="mb-3 border p-3">
+                        <h5 class="mb-3"><strong>Información de Producto</strong></h5>
+                        <div class="mb-3">
+                            <label for="product_name" class="form-label">Producto</label>
+                            <input type="text" id="product_name" name="product_name" class="form-control" required>
+                        </div>
 
-        <div class="mb-3">
-            <label for="channel" class="form-label">Canal</label>
-            <input id="channel" name="channel" class="form-control" list="canales" placeholder="Selecciona o escribe un canal" required>
-            <datalist id="canales">
-                <option value="WhatsApp Premium">
-                <option value="WhatsApp Hazla">
-                <option value="Messenger Tx">
-                <option value="Messenger Hazla">
-                <option value="Messenger Premium">
-            </datalist>
-        </div>
-    </div>
+                        <div class="mb-3">
+                            <label for="price" class="form-label">Precio</label>
+                            <input type="number" step="0.01" id="price" name="price" class="form-control" required>
+                        </div>
 
-    <!-- Sección: Otros -->
-    <div class="mb-3 border p-3">
-        <h5 class="mb-3"><strong>Otros</strong></h5>
-        <div class="mb-3">
-            <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="sharedCommission" name="is_shared" onclick="toggleSharedCommission()">
-                <label class="form-check-label" for="sharedCommission">
-                    Comisión compartida
-                </label>
-            </div>
-            <div id="sharedCommissionContainer" style="display: none;" class="mt-2">
-                <label for="sharedUser" class="form-label">Compartir con:</label>
-                <select id="sharedUser" name="shared_user" class="form-select">
-                    <?php
-                    $stmt = $pdo->prepare("SELECT id, username FROM users WHERE id != ?");
-                    $stmt->execute([$user_id]);
-                    $users = $stmt->fetchAll();
-                    foreach ($users as $user): ?>
-                        <option value="<?= $user['id'] ?>"><?= htmlspecialchars($user['username']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-        </div>
-        
-        <div class="mb-3">
-            <label for="description" class="form-label">Descripción (opcional)</label>
-            <textarea id="description" name="description" class="form-control" rows="2" placeholder="Escribe una descripción..."></textarea>
-        </div>
-    </div>
+                        <div class="mb-3">
+                            <label for="channel" class="form-label">Canal</label>
+                            <input id="channel" name="channel" class="form-control" list="canales"
+                                placeholder="Selecciona o escribe un canal" required>
+                            <datalist id="canales">
+                                <option value="WhatsApp Premium">
+                                <option value="WhatsApp Hazla">
+                                <option value="Messenger Tx">
+                                <option value="Messenger Hazla">
+                                <option value="Messenger Premium">
+                            </datalist>
+                        </div>
+                    </div>
 
-    <button type="submit" class="btn btn-success w-100">Guardar Comisión</button>
-</form>
+                    <!-- Sección: Otros -->
+                    <div class="mb-3 border p-3">
+                        <h5 class="mb-3"><strong>Otros</strong></h5>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="sharedCommission" name="is_shared"
+                                    onclick="toggleSharedCommission()">
+                                <label class="form-check-label" for="sharedCommission">
+                                    Comisión compartida
+                                </label>
+                            </div>
+                            <div id="sharedCommissionContainer" style="display: none;" class="mt-2">
+                                <label for="sharedUser" class="form-label">Compartir con:</label>
+                                <select id="sharedUser" name="shared_user" class="form-select">
+                                    <?php
+                                    $stmt = $pdo->prepare("SELECT id, username FROM users WHERE id != ?");
+                                    $stmt->execute([$user_id]);
+                                    $users = $stmt->fetchAll();
+                                    foreach ($users as $user): ?>
+                                        <option value="<?= $user['id'] ?>"><?= htmlspecialchars($user['username']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Descripción (opcional)</label>
+                            <textarea id="description" name="description" class="form-control" rows="2"
+                                placeholder="Escribe una descripción..."></textarea>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-success w-100">Guardar Comisión</button>
+                </form>
             </div>
         </div>
     </div>
@@ -680,55 +687,47 @@ include('header.php')
             .then(res => res.json())
             .then(data => {
                 if (data.exists) {
-                    const errorMessages = {
+                    const fieldsToMark = new Set();
+                    data.conflicts.forEach(conflict => {
+                        conflict.forEach(field => fieldsToMark.add(field));
+                    });
 
-                    };
-
-                    // Marcar todos los campos involucrados en los conflictos
-                    data.matchedFields.forEach(field => {
+                    fieldsToMark.forEach(field => {
                         if (field === 'operation_number') {
                             opInput.classList.add('is-invalid');
                             if (opFeedback) {
-                                opFeedback.textContent = 'Este número de operación coincide con una fecha o correo ya registrado';
+                                opFeedback.textContent = 'Este número de operación coincide con otro(s) campo(s) ya registrado(s)';
                                 opFeedback.style.display = 'block';
                             }
                         }
                         if (field === 'client_email') {
                             emailInput.classList.add('is-invalid');
                             if (emailFeedback) {
-                                emailFeedback.textContent = 'Este correo coincide con un numero de opración o fecha ya registrado';
+                                emailFeedback.textContent = 'Este correo coincide con otro(s) campo(s) ya registrado(s)';
                                 emailFeedback.style.display = 'block';
                             }
                         }
                         if (field === 'voucher_datetime') {
                             dateInput.classList.add('is-invalid');
                             if (dateFeedback) {
-                                dateFeedback.textContent = 'Esta fecha coincide con un numero de opreción o correo ya registrado';
+                                dateFeedback.textContent = 'Esta fecha coincide con otro(s) campo(s) ya registrado(s)';
                                 dateFeedback.style.display = 'block';
                             }
                         }
                     });
 
-                    // Mostrar mensaje general con los conflictos específicos
-                    if (data.conflicts && data.conflicts.length > 0) {
-                        const conflictMessages = data.conflicts.map(conflict => {
-                            const key = conflict.join('_');
-                            return errorMessages[key] || `Conflicto en ${conflict.join(' y ')}`;
-                        });
-
-                        const alertPlaceholder = document.getElementById('liveAlertPlaceholder');
-                        if (alertPlaceholder) {
-                            const wrapper = document.createElement('div');
-                            wrapper.innerHTML = [
-                                '<div class="alert alert-warning alert-dismissible fade show" role="alert">',
-                                '   <strong>Ten cuidado al ingresar comisiones ya ingresadas por otro usuario</strong><br>',
-
-                                '   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>',
-                                '</div>'
-                            ].join('');
-                            alertPlaceholder.innerHTML = '';
-                            alertPlaceholder.appendChild(wrapper);
-                        }
+                    // Mostrar mensaje general
+                    const alertPlaceholder = document.getElementById('liveAlertPlaceholder');
+                    if (alertPlaceholder) {
+                        const wrapper = document.createElement('div');
+                        wrapper.innerHTML = [
+                            '<div class="alert alert-warning alert-dismissible fade show" role="alert">',
+                            '   <strong>¡Atención! Fijate que no vayas a registrar una comision existente</strong><br>',
+                            '   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>',
+                            '</div>'
+                        ].join('');
+                        alertPlaceholder.innerHTML = '';
+                        alertPlaceholder.appendChild(wrapper);
                     }
                 } else {
                     // Marcar como válidos los campos con datos
