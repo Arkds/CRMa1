@@ -124,7 +124,7 @@ include('header.php')
 
     <div class="container my-5">
         <div id="liveAlertPlaceholder"></div>
-        <button type="button" class="btn btn-outline-dark float-end" id="liveAlertBtn">Ayuda</button>
+        <!--<button type="button" class="btn btn-outline-dark float-end" id="liveAlertBtn">Ayuda</button>-->
 
         <script>
             const alertPlaceholder = document.getElementById('liveAlertPlaceholder')
@@ -160,11 +160,11 @@ include('header.php')
             }
         </script>
         <h1 class="mb-4">Gestión de Socios</h1>
-        <button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>
+        <!--<button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>-->
 
 
         <button class="btn btn-success mb-3" onclick="window.location.replace('members_crud.php?action=add');">Agregar Nuevo Socio</button>
-        <a class="btn btn-danger mb-3" href="https://google.com">  test no hacer click </a>
+        
 
 
         <?php if ($action == 'add' || $action == 'edit') { ?>

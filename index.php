@@ -382,7 +382,7 @@ include('header.php')
                     borderColor: 'rgba(54, 162, 235, 1)',
                     borderWidth: 2,
                     fill: true,
-                    tension: 0.2,
+                    tension: 0.5,
                     pointRadius: 6, // Tamaño de los puntos
                     pointHoverRadius: 8, // Tamaño al pasar el mouse
                     pointBackgroundColor: 'rgba(54, 162, 235, 1)', // Color del punto

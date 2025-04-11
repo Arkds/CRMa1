@@ -273,7 +273,7 @@ include('header.php')
 
     <div class="container py-4">
         <div id="liveAlertPlaceholder"></div>
-        <button type="button" class="btn btn-outline-dark float-end" id="liveAlertBtn">Ayuda</button>
+        <!--<button type="button" class="btn btn-outline-dark float-end" id="liveAlertBtn">Ayuda</button>-->
 
         <script>
             const alertPlaceholder = document.getElementById('liveAlertPlaceholder')
@@ -310,7 +310,7 @@ include('header.php')
             }
         </script>
         <h1 class="text-center">Gestión de Reportes</h1>
-        <button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>
+        <!--<button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>-->
         <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#reportModal">Agregar Reporte</button>
         <?php if ($isAdmin): ?>
             <button class="btn btn-info mb-3" onclick="window.location.href='report_custom.php';">Ver Reportes Personalizados</button>

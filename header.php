@@ -166,16 +166,20 @@
                     <button class="nav-link btn btn-link text-white" onclick="window.location.href='tracin_crud.php';">
                         Seguimientos
                     </button>
-                </div>
-
-                <!-- Íconos de ayuda y salir alineados a la derecha con mayor tamaño -->
-                <div class="ms-auto d-flex gap-3">
-                    <button class="nav-link btn btn-link text-white nav-icons" id="liveAlertBtn">
-                        <i class="bi bi-question-circle"></i> <!-- Ícono de ayuda -->
+                    <button class="nav-link btn btn-link text-white" onclick="window.location.href='certificaciones.php';">
+                        Certificaciones
                     </button>
+                </div>
+                <div class="ms-auto d-flex gap-3 align-items-center">
+                    <span class="text-white"><em>Usted esta como: </em><strong> <?= htmlspecialchars($username) ?> </strong></span>
+                
+                    <button class="nav-link btn btn-link text-white nav-icons" id="liveAlertBtn">
+                        <i class="bi bi-question-circle"></i>
+                    </button>
+                
                     <button class="nav-link btn btn-link text-white nav-icons"
                         onclick="window.location.href='logout.php';">
-                        <i class="bi bi-box-arrow-right"></i> <!-- Ícono de salir -->
+                        <i class="bi bi-box-arrow-right"></i>
                     </button>
                 </div>
             </div>
@@ -211,6 +215,14 @@
                 }
             });
         });
+    </script>
+    <script>
+        document.addEventListener('keydown', function(event) {
+    if (event.ctrlKey && event.key === 'l') {
+        event.preventDefault();  // Esto bloquea el atajo Ctrl+L
+    }
+});
+
     </script>
     <!-- Bootstrap JS (requerido para el modal) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

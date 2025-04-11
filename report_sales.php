@@ -77,7 +77,7 @@ include('header.php')
 
     <div class="container mt-5">
         <div id="liveAlertPlaceholder"></div>
-        <button type="button" class="btn btn-outline-dark float-end" id="liveAlertBtn">Ayuda</button>
+        <!--<button type="button" class="btn btn-outline-dark float-end" id="liveAlertBtn">Ayuda</button>-->
 
         <script>
             const alertPlaceholder = document.getElementById('liveAlertPlaceholder')
@@ -113,9 +113,8 @@ include('header.php')
 
 
 
-        <button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>
+        <!--<button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>-->
 
-        <!-- Formulario de Filtro -->
         <form method="GET" class="mb-4">
             <div class="row">
                 <div class="col-md-3">

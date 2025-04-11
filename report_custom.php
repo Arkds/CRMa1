@@ -68,7 +68,7 @@ include('header.php')
 
     <div class="container py-4">
         <h1 class="text-center">Reportes Personalizados</h1>
-        <button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>
+        <!--<button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>-->
 
 
         <form method="GET" action="report_custom.php" class="mb-4">

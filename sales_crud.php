@@ -88,7 +88,7 @@ include('header.php')
 
 <div class="container mt-5">
     <div id="liveAlertPlaceholder"></div>
-    <button type="button" class="btn btn-outline-dark float-end" id="liveAlertBtn">Ayuda</button>
+    <!--<button type="button" class="btn btn-outline-dark float-end" id="liveAlertBtn">Ayuda</button>-->
 
     <script>
         const alertPlaceholder = document.getElementById('liveAlertPlaceholder')
@@ -122,7 +122,7 @@ include('header.php')
         }
     </script>
     <h1 class="text-center">Gestión de Ventas</h1>
-    <button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>
+    <!--<button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>-->
     <button class="btn btn-outline-primary mb-3"
         onclick="window.location.replace('commissions_crud.php');">Comisiones</button>
 
@@ -172,7 +172,7 @@ include('header.php')
 
     <!-- Tabla de ventas -->
     <h2>Ventas Registradas</h2>
-    <table id="salesTable" class="table table-striped">
+    <table id="salesTable" class="table table-striped display compact table-bordered ">
         <thead>
             <tr>
                 <th>ID</th>

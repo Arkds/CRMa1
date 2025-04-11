@@ -317,7 +317,12 @@ include('header.php')
                     <td><?= htmlspecialchars($commission['price']) ?></td>
                     <td><?= htmlspecialchars($commission['channel']) ?></td>
                     <td><?= htmlspecialchars($commission['operation_number']) ?></td>
-                    <td><?= htmlspecialchars($commission['client_email']) ?></td>
+                    <td>
+                        <div class="text-truncate" style="max-width: 100px; cursor:pointer;" onclick="toggleExpand(this)">
+                            <?= htmlspecialchars($commission['client_email']) ?>
+                        </div>
+                    </td>
+                    <!--<td><?= htmlspecialchars($commission['client_email']) ?></td>-->
                     <td><?= htmlspecialchars($commission['voucher_datetime']) ?></td>
 
 
@@ -340,7 +345,10 @@ include('header.php')
                             <span class="text-muted">Sin comprobantes</span>
                         <?php endif; ?>
                     </td>
-                    <td><?= !empty($commission['description']) ? htmlspecialchars($commission['description']) : '<span class="text-muted">Sin descripción</span>'; ?>
+                    <td>
+                        <div class="text-truncate" style="max-width: 150px; cursor:pointer;" onclick="toggleExpand(this)">
+                            <?= !empty($commission['description']) ? nl2br(htmlspecialchars($commission['description'])) : '<span class="text-muted">Sin descripción</span>'; ?>
+                        </div>
                     </td>
                     <td><?= $isAdmin ? htmlspecialchars($commission['username']) : htmlspecialchars($username) ?></td>
                     <td class="text-center">
@@ -396,6 +404,20 @@ include('header.php')
             <?php endforeach; ?>
         </tbody>
     </table>
+    <script>
+    function toggleExpand(element) {
+        if (element.style.whiteSpace === "normal") {
+            element.style.whiteSpace = "nowrap";
+            element.style.overflow = "hidden";
+            element.style.textOverflow = "ellipsis";
+            element.style.maxWidth = "150px";
+        } else {
+            element.style.whiteSpace = "normal";
+            element.style.maxWidth = "none";
+            element.style.overflow = "visible";
+        }
+    }
+</script>
 </div>
 <!-- Modal para agregar/editar comisión -->
 <div class="modal fade" id="commissionModal" tabindex="-1" aria-labelledby="commissionModalLabel" aria-hidden="true">

@@ -56,7 +56,7 @@ include('header.php')
 
     <div class="container mt-5">
         <div id="liveAlertPlaceholder"></div>
-        <button type="button" class="btn btn-outline-dark float-end" id="liveAlertBtn">Ayuda</button>
+        <!--<button type="button" class="btn btn-outline-dark float-end" id="liveAlertBtn">Ayuda</button>-->
 
         <script>
             const alertPlaceholder = document.getElementById('liveAlertPlaceholder')
@@ -93,7 +93,7 @@ include('header.php')
             }
         </script>
         <h1 class="text-center">Seguimiento de Clientes</h1>
-        <button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>
+        <!--<button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>-->
         <!-- Tabla 1: Clientes en proceso -->
         <h2 class="mt-5 text-primary">Clientes en Proceso</h2>
         <table class="table table-bordered table-striped" id="tracintable1">

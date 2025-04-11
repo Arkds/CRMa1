@@ -102,22 +102,17 @@ include('header.php')
 
     ?>
 
-<!-- Estilos de Select2 -->
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0/dist/css/select2.min.css" rel="stylesheet" />
 
-<!-- Script de Select2 -->
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0/dist/js/select2.min.js"></script>
 
 <div class="container mt-5">
     <h1 class="text-center">Gestión de Productos</h1>
-    <button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>
-    <!-- Botón para agregar un nuevo producto -->
+    <!--<button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>-->
     <button class="btn btn-primary mb-3" onclick="openProductModal()">Agregar Producto</button>
 
-    <!-- En la tabla, modificar el botón de editar -->
 
 
-    <!-- Tabla de productos -->
     <table id="productsTable" class="table table-striped">
         <thead>
             <tr>

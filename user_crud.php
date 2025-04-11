@@ -91,7 +91,7 @@ include('header.php')
 
 <div class="container mt-5">
     <h1 class="text-center">Gestión de Usuarios</h1>
-    <button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>
+    <!--<button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>-->
     <button class="btn btn-primary mb-3" onclick="window.location.replace('user_crud.php?action=create');">Agregar
         Usuariob</button>
     <!-- Tabla de Usuarios -->
