@@ -1,4 +1,6 @@
 <?php
+ob_start(); // Inicia el buffer de salida
+
 if (isset($_COOKIE['user_session'])) {
     // Decodificar la cookie
     $user_data = json_decode(base64_decode($_COOKIE['user_session']), true);
@@ -182,39 +184,56 @@ include('header.php')
                     value="<?= $saleToEdit['quantity'] ?? '1' ?>" required>
             </div>
             <div class="col-md-5 d-flex align-items-end justify-content-end gap-2">
-                <?php if ($action === 'edit'): ?>
-                    <a href="sales_crud.php" class="btn btn-danger w-25">
-                        Cancelar
-                    </a>
+    <?php if ($action === 'edit'): ?>
+        <a href="sales_crud.php" class="btn btn-danger w-25">
+            Cancelar
+        </a>
 
-                    <?php if ($saleToEdit['currency'] === 'PEN'): ?>
-                        <button type="submit" name="currency" value="MXN" class="btn btn-success w-50">
-                            Cambiar a MXN
-                        </button>
-                        <button type="submit" name="currency" value="PEN" class="btn btn-primary w-50"
-                            style="background-color: #0D47A1;">
-                            Actualizar PEN
-                        </button>
-                    <?php else: ?>
-                        <button type="submit" name="currency" value="MXN" class="btn btn-success w-50">
-                            Actualizar MXN
-                        </button>
-                        <button type="submit" name="currency" value="PEN" class="btn btn-primary w-50"
-                            style="background-color: #0D47A1;">
-                            Cambiar a PEN
-                        </button>
-                    <?php endif; ?>
-                <?php else: ?>
-                    <button type="submit" name="currency" value="PEN" class="btn btn-primary w-50"
-                        style="background-color: #0D47A1;">
-                        Guardar PEN
-                    </button>
-                    <button type="submit" name="currency" value="MXN" class="btn btn-success w-50">
-                        Guardar MXN
-                    </button>
-
-                <?php endif; ?>
+        <?php if ($saleToEdit['currency'] === 'PEN'): ?>
+            <div class="w-50">
+                <small class="text-muted d-block mb-1">Cambiar moneda de PEN a:</small>
+                <button type="submit" name="currency" value="MXN" class="btn btn-success w-100">
+                    Cambiar a MXN
+                </button>
             </div>
+            <div class="w-50">
+                <small class="text-muted d-block mb-1">Mantener en:</small>
+                <button type="submit" name="currency" value="PEN" class="btn btn-primary w-100"
+                    style="background-color: #0D47A1;">
+                    Actualizar PEN
+                </button>
+            </div>
+        <?php else: ?>
+            <div class="w-50">
+                <small class="text-muted d-block mb-1">Mantener en:</small>
+                <button type="submit" name="currency" value="MXN" class="btn btn-success w-100">
+                    Actualizar MXN
+                </button>
+            </div>
+            <div class="w-50">
+                <small class="text-muted d-block mb-1">Cambiar moneda de MXN a:</small>
+                <button type="submit" name="currency" value="PEN" class="btn btn-primary w-100"
+                    style="background-color: #0D47A1;">
+                    Cambiar a PEN
+                </button>
+            </div>
+        <?php endif; ?>
+    <?php else: ?>
+        <div class="w-50">
+            <small class="text-muted d-block mb-1">Guardar en moneda peruana:</small>
+            <button type="submit" name="currency" value="PEN" class="btn btn-primary w-100"
+                style="background-color: #0D47A1;">
+                Guardar PEN
+            </button>
+        </div>
+        <div class="w-50">
+            <small class="text-muted d-block mb-1">Guardar en moneda mexicana:</small>
+            <button type="submit" name="currency" value="MXN" class="btn btn-success w-100">
+                Guardar MXN
+            </button>
+        </div>
+    <?php endif; ?>
+</div>
         </div>
 
         <!-- Botón para mostrar/ocultar opciones de moneda -->
@@ -226,59 +245,49 @@ include('header.php')
         </div>
 
         <!-- Sección colapsable para monedas adicionales -->
-        <div class="collapse mt-3" id="moreCurrencies">
-            <div class="card card-body position-relative">
-                <!-- Botón de cierre a la derecha -->
-                <button type="button" class="btn-close position-absolute top-0 end-0 m-2" aria-label="Cerrar"
-                    onclick="hideCurrencyCollapse()"></button>
-
-                <div class="row mt-2">
-                    <div class="col-md-6 offset-md-3">
-                        <label for="other_currency" class="form-label">Seleccione otra moneda</label>
-                        <select class="form-select" id="other_currency" name="other_currency"> <!-- Cambiado el name -->
-                            <option value="USD">Dólares Americanos (USD)</option>
-                            <option value="EUR">Euros (EUR)</option>
-                            <option value="BRL">Reales Brasileños (BRL)</option>
-                            <option value="COP">Pesos Colombianos (COP)</option>
-                            <option value="CLP">Pesos Chilenos (CLP)</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3 d-flex align-items-end">
-                        <button type="button" class="btn btn-info w-100" onclick="submitWithOtherCurrency()">
-                            <!-- Cambiado a type="button" -->
-                            <i class="bi bi-send-check"></i> Guardar
-                        </button>
-                    </div>
+        <!-- Sección colapsable para monedas adicionales -->
+<!-- Sección colapsable para monedas adicionales -->
+<div class="collapse mt-3" id="moreCurrencies">
+    <div class="card card-body position-relative"> <!-- position-relative para posicionar el botón de cierre -->
+        <!-- Botón de cierre en la esquina superior derecha -->
+        <button type="button" class="btn-close position-absolute top-0 end-0 m-2" 
+                aria-label="Cerrar" onclick="hideCurrencyCollapse()"></button>
+        
+        <div class="row mt-2">
+            <div class="col-md-6 offset-md-3">
+                <label class="form-label">Seleccione otra moneda</label>
+                <div class="d-flex flex-column">
+                    <button type="submit" name="currency" value="USD" class="btn btn-outline-secondary mb-2">
+                        Guardar en dólares americanos USD
+                    </button>
+                    <button type="submit" name="currency" value="COL" class="btn btn-outline-secondary mb-2">
+                        Guardar en pesos colombianos COL
+                    </button>
+                    <button type="submit" name="currency" value="EUR" class="btn btn-outline-secondary mb-2">
+                        Guardar en euros EUR
+                    </button>
+                    <button type="submit" name="currency" value="BRL" class="btn btn-outline-secondary mb-2">
+                        Guardar en reales brasileños BRL
+                    </button>
+                    <button type="submit" name="currency" value="CLP" class="btn btn-outline-secondary mb-2">
+                        Guardar en pesos chilenos CLP
+                    </button>
                 </div>
             </div>
         </div>
+    </div>
+</div>
 
-        <script>
-            // Función para enviar el formulario con la moneda seleccionada
-            function submitWithOtherCurrency() {
-                const otherCurrency = document.getElementById('other_currency').value;
-                const form = document.forms[0];
+<script>
+// Función para ocultar el collapse
+function hideCurrencyCollapse() {
+    const collapseElement = document.getElementById('moreCurrencies');
+    const bsCollapse = new bootstrap.Collapse(collapseElement);
+    bsCollapse.hide();
+}
+</script>
 
-                // Crear un input hidden para la moneda
-                const currencyInput = document.createElement('input');
-                currencyInput.type = 'hidden';
-                currencyInput.name = 'currency';
-                currencyInput.value = otherCurrency;
 
-                // Agregarlo al formulario
-                form.appendChild(currencyInput);
-
-                // Enviar el formulario
-                form.submit();
-            }
-
-            // Función para ocultar el collapse
-            function hideCurrencyCollapse() {
-                const collapseElement = document.getElementById('moreCurrencies');
-                const bsCollapse = new bootstrap.Collapse(collapseElement);
-                bsCollapse.hide();
-            }
-        </script>
         <input type="hidden" name="original_currency" value="<?= $saleToEdit['currency'] ?? 'MXN' ?>">
     </form>
 
@@ -313,7 +322,8 @@ include('header.php')
                         <a href="sales_crud.php?action=edit&id=<?= $sale['id'] ?>" class="btn btn-warning btn-sm">Editar</a>
                     </td>
                 </tr>
-            <?php endforeach; ?>
+            <?php endforeach;  ob_end_flush(); // Envía el buffer al final
+?>
 
         </tbody>
     </table>
