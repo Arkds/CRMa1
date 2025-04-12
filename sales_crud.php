@@ -205,32 +205,37 @@ include('header.php')
                         </button>
                     <?php endif; ?>
                 <?php else: ?>
-                    <button type="submit" name="currency" value="MXN" class="btn btn-success w-50">
-                        Guardar en PESOS
-                    </button>
                     <button type="submit" name="currency" value="PEN" class="btn btn-primary w-50"
                         style="background-color: #0D47A1;">
-                        Guardar en SOLES
+                        Guardar PEN
                     </button>
+                    <button type="submit" name="currency" value="MXN" class="btn btn-success w-50">
+                        Guardar MXN
+                    </button>
+
                 <?php endif; ?>
             </div>
         </div>
 
-        <!-- Botón para mostrar más opciones de moneda -->
+        <!-- Botón para mostrar/ocultar opciones de moneda -->
         <div class="text-center mt-2">
             <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse"
-                data-bs-target="#moreCurrencies">
+                data-bs-target="#moreCurrencies" id="toggleCurrenciesBtn">
                 <i class="bi bi-currency-exchange"></i> Más opciones de moneda
             </button>
         </div>
 
         <!-- Sección colapsable para monedas adicionales -->
         <div class="collapse mt-3" id="moreCurrencies">
-            <div class="card card-body">
-                <div class="row">
+            <div class="card card-body position-relative">
+                <!-- Botón de cierre a la derecha -->
+                <button type="button" class="btn-close position-absolute top-0 end-0 m-2" aria-label="Cerrar"
+                    onclick="hideCurrencyCollapse()"></button>
+
+                <div class="row mt-2">
                     <div class="col-md-6 offset-md-3">
                         <label for="other_currency" class="form-label">Seleccione otra moneda</label>
-                        <select class="form-select" id="other_currency" name="currency">
+                        <select class="form-select" id="other_currency" name="other_currency"> <!-- Cambiado el name -->
                             <option value="USD">Dólares Americanos (USD)</option>
                             <option value="EUR">Euros (EUR)</option>
                             <option value="BRL">Reales Brasileños (BRL)</option>
@@ -239,7 +244,8 @@ include('header.php')
                         </select>
                     </div>
                     <div class="col-md-3 d-flex align-items-end">
-                        <button type="submit" class="btn btn-info w-100">
+                        <button type="button" class="btn btn-info w-100" onclick="submitWithOtherCurrency()">
+                            <!-- Cambiado a type="button" -->
                             <i class="bi bi-send-check"></i> Guardar
                         </button>
                     </div>
@@ -247,6 +253,32 @@ include('header.php')
             </div>
         </div>
 
+        <script>
+            // Función para enviar el formulario con la moneda seleccionada
+            function submitWithOtherCurrency() {
+                const otherCurrency = document.getElementById('other_currency').value;
+                const form = document.forms[0];
+
+                // Crear un input hidden para la moneda
+                const currencyInput = document.createElement('input');
+                currencyInput.type = 'hidden';
+                currencyInput.name = 'currency';
+                currencyInput.value = otherCurrency;
+
+                // Agregarlo al formulario
+                form.appendChild(currencyInput);
+
+                // Enviar el formulario
+                form.submit();
+            }
+
+            // Función para ocultar el collapse
+            function hideCurrencyCollapse() {
+                const collapseElement = document.getElementById('moreCurrencies');
+                const bsCollapse = new bootstrap.Collapse(collapseElement);
+                bsCollapse.hide();
+            }
+        </script>
         <input type="hidden" name="original_currency" value="<?= $saleToEdit['currency'] ?? 'MXN' ?>">
     </form>
 
@@ -282,8 +314,10 @@ include('header.php')
                     </td>
                 </tr>
             <?php endforeach; ?>
+
         </tbody>
     </table>
+
 </div>
 
 <!-- Inicialización de DataTables -->

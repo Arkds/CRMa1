@@ -29,7 +29,11 @@ $selectedUser = $_GET['user_id'] ?? null;
 // Construir la consulta SQL seg��n los filtros
 $query = "SELECT s.*, u.username FROM sales s JOIN users u ON s.user_id = u.id WHERE 1=1";
 $params = [];
-
+if (!empty($_GET['currency'])) {
+    $placeholders = implode(',', array_fill(0, count($_GET['currency']), '?'));
+    $query .= " AND s.currency IN ($placeholders)";
+    $params = array_merge($params, $_GET['currency']);
+}
 // Filtrar por fecha exacta
 if ($date) {
     $query .= " AND DATE(s.created_at) = ?";
@@ -70,7 +74,7 @@ $usersStmt = $pdo->query($usersQuery);
 $users = $usersStmt->fetchAll(PDO::FETCH_ASSOC);
 include('header.php')
 
-?>
+    ?>
 
 
 <body>
@@ -144,6 +148,28 @@ include('header.php')
                     </select>
                 </div>
             </div>
+            <!-- Filtro de monedas mejor integrado -->
+            <div class="col-md-3 mt-2">
+                <div class="border p-2 rounded"> 
+                    <label class="form-label d-block mb-1">Moneda</label> 
+                    <div class="form-check form-check-inline"> 
+                        <input class="form-check-input" type="checkbox" name="currency[]" value="MXN" id="currencyMXN"
+                            <?= (empty($_GET['currency']) || in_array('MXN', $_GET['currency'] ?? [])) ? 'checked' : '' ?>>
+                        <label class="form-check-label small" for="currencyMXN">MXN</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" name="currency[]" value="PEN" id="currencyPEN"
+                            <?= in_array('PEN', $_GET['currency'] ?? []) ? 'checked' : '' ?>>
+                        <label class="form-check-label small" for="currencyPEN">PEN</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" name="currency[]" value="USD" id="currencyUSD"
+                            <?= in_array('USD', $_GET['currency'] ?? []) ? 'checked' : '' ?>>
+                        <label class="form-check-label small" for="currencyUSD">USD</label>
+                    </div>
+                </div>
+            </div>
+
             <div class="row mt-3">
                 <div class="col-md-2">
                     <button type="submit" class="btn btn-primary w-100">Filtrar</button>
@@ -151,15 +177,49 @@ include('header.php')
             </div>
         </form>
         <!-- Resumen de Totales -->
-        <div class="mt-4">
+        <div class="mt-1">
             <h4>Resumen de Totales</h4>
-            <p><strong>Total de Productos Vendidos:</strong> <?= $totalQuantity ?></p>
-        
-            <?php if ($isAdmin): ?>
-                <p><strong>Monto Total:</strong> $ <?= number_format($totalAmount, 2) ?></p>
-            <?php endif; ?>
-        </div>
+            <?php
+            $totalsByCurrency = [];
+            foreach ($sales as $sale) {
+                $currency = $sale['currency'];
+                if (!isset($totalsByCurrency[$currency])) {
+                    $totalsByCurrency[$currency] = [
+                        'quantity' => 0,
+                        'amount' => 0.0
+                    ];
+                }
+                $totalsByCurrency[$currency]['quantity'] += $sale['quantity'];
+                $totalsByCurrency[$currency]['amount'] += $sale['price'] * $sale['quantity'];
+            }
+            ?>
 
+            <div class="row">
+                <?php foreach ($totalsByCurrency as $currency => $totals): ?>
+                    <div class="col-md-3 mb-1">
+                        <div class="card">
+                            <div class="card-body small"> 
+                                <h6 class="card-title mb-1 text-uppercase"><?= $currency ?></h6>
+                                <p class="card-text mb-0">
+                                    <strong>Productos:</strong> <?= $totals['quantity'] ?><br>
+                                    <strong>Monto Total:</strong> <?= $currency ?>
+                                    <?= number_format($totals['amount'], 2) ?>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                <?php endforeach; ?>
+            </div>
+
+            <!-- Total general -->
+            <div class="alert alert-primary mt-3">
+                <strong>Total General de Productos:</strong> <?= $totalQuantity ?><br>
+                <?php if ($isAdmin): ?>
+                    <strong>Monto Total General:</strong> $ <?= number_format($totalAmount, 2) ?>
+                <?php endif; ?>
+            </div>
+        </div>
         <!-- Tabla de Ventas -->
         <h2>Ventas Registradas</h2>
         <table id="salesTable" class="table table-striped">
@@ -168,6 +228,7 @@ include('header.php')
                     <th>ID</th>
                     <th>Producto</th>
                     <th>Precio</th>
+                    <th>Moneda</th>
                     <th>Cantidad</th>
                     <th>Total</th>
                     <th>Vendedor</th>
@@ -181,6 +242,8 @@ include('header.php')
                             <td><?= $sale['id'] ?></td>
                             <td><?= htmlspecialchars($sale['product_name']) ?></td>
                             <td><?= htmlspecialchars($sale['price']) ?></td>
+                            <td><?= strtoupper($sale['currency']) ?></td>
+
                             <td><?= htmlspecialchars($sale['quantity']) ?></td>
                             <td><?= number_format($sale['price'] * $sale['quantity'], 2) ?></td>
                             <td><?= htmlspecialchars($sale['username']) ?></td>
@@ -205,7 +268,7 @@ include('header.php')
                 paging: true,
                 searching: true,
                 ordering: true,
-                order: [[6, 'desc']],
+                order: [[0, 'desc']],
                 language: {
                     url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
                 }
