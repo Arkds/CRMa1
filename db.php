@@ -1,6 +1,6 @@
 <?php
 $host = 'localhost';
-$dbname = 'CRMBKP';
+$dbname = 'CRMBKP2';
 $user = 'root';
 $pass = '';
 

@@ -43,22 +43,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $productName = $_POST['product_name'];
     $price = $_POST['price'];
     $quantity = $_POST['quantity'];
+    $currency = $_POST['currency'] ?? 'MXN'; // Default a MXN si no hay selección
+
 
     if ($action === 'create') {
-        $stmt = $pdo->prepare("INSERT INTO sales (product_name, price, quantity, user_id) VALUES (?, ?, ?, ?)");
-        $stmt->execute([$productName, $price, $quantity, $user_id]);
-        setcookie('success_message', "¡La venta de '$productName' se registró correctamente!", time() + 5, "/");
+        $stmt = $pdo->prepare("INSERT INTO sales (product_name, price, quantity, user_id, currency) 
+                              VALUES (?, ?, ?, ?, ?)");
+        $stmt->execute([$productName, $price, $quantity, $user_id, $currency]);
+
+        setcookie('success_message', "¡Venta registrada en $currency!", time() + 5, "/");
         header('Location: sales_crud.php');
         exit;
     }
 
-    if ($action === 'edit' && $id) {
-        $stmt = $pdo->prepare("UPDATE sales SET product_name = ?, price = ?, quantity = ? WHERE id = ?");
-        $stmt->execute([$productName, $price, $quantity, $id]);
-        setcookie('success_message', "¡La venta de '$productName' se registró correctamente!", time() + 5, "/");
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $productName = $_POST['product_name'];
+        $price = $_POST['price'];
+        $quantity = $_POST['quantity'];
+        $currency = $_POST['currency'] ?? 'MXN'; // Moneda seleccionada (PEN o MXN)
 
-        header('Location: sales_crud.php');
-        exit;
+        // Si estamos editando, usa la moneda del botón, NO la original
+        if ($action === 'edit' && $id) {
+            $stmt = $pdo->prepare("UPDATE sales SET 
+                                 product_name = ?, 
+                                 price = ?, 
+                                 quantity = ?, 
+                                 currency = ? 
+                                 WHERE id = ?");
+            $stmt->execute([$productName, $price, $quantity, $currency, $id]);
+
+            setcookie('success_message', "¡Venta actualizada en $currency!", time() + 5, "/");
+            header('Location: sales_crud.php');
+            exit;
+        }
+
+        // Lógica para creación (ya la tienes)
     }
 }
 if (!$isAdmin) {
@@ -145,29 +164,90 @@ include('header.php')
             <div class="col-md-4">
                 <label for="product_name" class="form-label">Producto</label>
                 <input type="text" class="form-control" id="product_name" name="product_name" list="productList"
-                    value="<?= $saleToEdit['product_name'] ?? 'ProductoA ' ?>" required>
+                    value="<?= $saleToEdit['product_name'] ?? ' ' ?>" required>
                 <datalist id="productList">
                     <?php foreach ($products as $product): ?>
                         <option value="<?= htmlspecialchars($product['name']) ?>"></option>
                     <?php endforeach; ?>
                 </datalist>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label for="price" class="form-label">Precio</label>
                 <input type="number" step="0.01" class="form-control" id="price" name="price"
                     value="<?= $saleToEdit['price'] ?? '' ?>" required>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-1">
                 <label for="quantity" class="form-label">Cantidad</label>
                 <input type="number" class="form-control" id="quantity" name="quantity"
                     value="<?= $saleToEdit['quantity'] ?? '1' ?>" required>
             </div>
-            <div class="col-md-2 d-flex align-items-end">
-                <button type="submit" class="btn btn-success w-100">
-                    <?= $action === 'edit' ? 'Actualizar' : 'Guardar' ?>
-                </button>
+            <div class="col-md-5 d-flex align-items-end justify-content-end gap-2">
+                <?php if ($action === 'edit'): ?>
+                    <a href="sales_crud.php" class="btn btn-danger w-25">
+                        Cancelar
+                    </a>
+
+                    <?php if ($saleToEdit['currency'] === 'PEN'): ?>
+                        <button type="submit" name="currency" value="MXN" class="btn btn-success w-50">
+                            Cambiar a MXN
+                        </button>
+                        <button type="submit" name="currency" value="PEN" class="btn btn-primary w-50"
+                            style="background-color: #0D47A1;">
+                            Actualizar PEN
+                        </button>
+                    <?php else: ?>
+                        <button type="submit" name="currency" value="MXN" class="btn btn-success w-50">
+                            Actualizar MXN
+                        </button>
+                        <button type="submit" name="currency" value="PEN" class="btn btn-primary w-50"
+                            style="background-color: #0D47A1;">
+                            Cambiar a PEN
+                        </button>
+                    <?php endif; ?>
+                <?php else: ?>
+                    <button type="submit" name="currency" value="MXN" class="btn btn-success w-50">
+                        Guardar en PESOS
+                    </button>
+                    <button type="submit" name="currency" value="PEN" class="btn btn-primary w-50"
+                        style="background-color: #0D47A1;">
+                        Guardar en SOLES
+                    </button>
+                <?php endif; ?>
             </div>
         </div>
+
+        <!-- Botón para mostrar más opciones de moneda -->
+        <div class="text-center mt-2">
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse"
+                data-bs-target="#moreCurrencies">
+                <i class="bi bi-currency-exchange"></i> Más opciones de moneda
+            </button>
+        </div>
+
+        <!-- Sección colapsable para monedas adicionales -->
+        <div class="collapse mt-3" id="moreCurrencies">
+            <div class="card card-body">
+                <div class="row">
+                    <div class="col-md-6 offset-md-3">
+                        <label for="other_currency" class="form-label">Seleccione otra moneda</label>
+                        <select class="form-select" id="other_currency" name="currency">
+                            <option value="USD">Dólares Americanos (USD)</option>
+                            <option value="EUR">Euros (EUR)</option>
+                            <option value="BRL">Reales Brasileños (BRL)</option>
+                            <option value="COP">Pesos Colombianos (COP)</option>
+                            <option value="CLP">Pesos Chilenos (CLP)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-info w-100">
+                            <i class="bi bi-send-check"></i> Guardar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <input type="hidden" name="original_currency" value="<?= $saleToEdit['currency'] ?? 'MXN' ?>">
     </form>
 
     <!-- Tabla de ventas -->
@@ -178,6 +258,7 @@ include('header.php')
                 <th>ID</th>
                 <th>Producto</th>
                 <th>Precio</th>
+                <th>Moneda</th>
                 <th>Cantidad</th>
                 <th>Total</th>
                 <th>Vendedor</th>
@@ -191,6 +272,7 @@ include('header.php')
                     <td><?= $sale['id'] ?></td>
                     <td><?= htmlspecialchars($sale['product_name']) ?></td>
                     <td><?= htmlspecialchars($sale['price']) ?></td>
+                    <td><?= strtoupper($sale['currency']) ?></td>
                     <td><?= htmlspecialchars($sale['quantity']) ?></td>
                     <td><?= number_format($sale['price'] * $sale['quantity'], 2) ?></td>
                     <td><?= $isAdmin ? htmlspecialchars($sale['username']) : htmlspecialchars($username) ?></td>
@@ -211,7 +293,7 @@ include('header.php')
             paging: true,
             searching: true,
             ordering: true,
-            order: [[6, 'desc']],
+            order: [[0, 'desc']],
             language: {
                 url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
             }
@@ -221,6 +303,8 @@ include('header.php')
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
     integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
     crossorigin="anonymous"></script>
+
+
 </body>
 
 </html>
