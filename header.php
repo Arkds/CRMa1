@@ -1,6 +1,5 @@
 <?php include 'feedback.php'; ?>
 
-
 <!DOCTYPE html>
 <html lang="en">
 
@@ -116,8 +115,12 @@
                 <a class="navbar-brand nav-icons-big" href="index.php">
                     <i class="bi bi-house"></i>
                 </a>
-            </div>
 
+                <!-- Botón de recargar página -->
+                <button class="nav-link btn btn-link text-white nav-icons-big" onclick="window.location.reload();">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </div>
 
             <!-- Toggler en pantallas pequeñas -->
             <button class="navbar-toggler d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
@@ -145,7 +148,6 @@
                         </ul>
                     </div>
 
-
                     <?php if (isset($isAdmin) && $isAdmin): ?>
                         <button class="nav-link btn btn-link text-white" onclick="window.location.href='report_sales.php';">
                             Reportes Ventas
@@ -166,17 +168,19 @@
                     <button class="nav-link btn btn-link text-white" onclick="window.location.href='tracin_crud.php';">
                         Seguimientos
                     </button>
-                    <button class="nav-link btn btn-link text-white" onclick="window.location.href='certificaciones.php';">
+                    <button class="nav-link btn btn-link text-white"
+                        onclick="window.location.href='certificaciones.php';">
                         Certificaciones
                     </button>
                 </div>
                 <div class="ms-auto d-flex gap-3 align-items-center">
-                    <span class="text-white"><em>Usted esta como: </em><strong> <?= htmlspecialchars($username) ?> </strong></span>
-                
+                    <span class="text-white"><em>Usted esta como: </em><strong> <?= htmlspecialchars($username) ?>
+                        </strong></span>
+
                     <button class="nav-link btn btn-link text-white nav-icons" id="liveAlertBtn">
                         <i class="bi bi-question-circle"></i>
                     </button>
-                
+
                     <button class="nav-link btn btn-link text-white nav-icons"
                         onclick="window.location.href='logout.php';">
                         <i class="bi bi-box-arrow-right"></i>
@@ -205,6 +209,7 @@
 
             document.getElementById('liveAlertBtn').addEventListener('click', () => {
                 const message = `<?php echo isset($helpMessage) ? $helpMessage : 'No hay instrucciones disponibles para esta página.'; ?>`;
+                appendAlert(message, 'info');
             });
 
             // Resaltar el botón activo
@@ -217,12 +222,17 @@
         });
     </script>
     <script>
-        document.addEventListener('keydown', function(event) {
-    if (event.ctrlKey && event.key === 'l') {
-        event.preventDefault();  // Esto bloquea el atajo Ctrl+L
-    }
-});
-
+        document.addEventListener('keydown', function (event) {
+            if (event.ctrlKey && event.key === 'l') {
+                event.preventDefault();  // Esto bloquea el atajo Ctrl+L
+            }
+            // Bloquear la tecla Enter (código 13)
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                // Opcional: puedes mostrar una alerta o feedback al usuario
+                // alert('La tecla Enter está deshabilitada en esta página');
+            }
+        });
     </script>
     <!-- Bootstrap JS (requerido para el modal) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
