@@ -116,7 +116,6 @@
                     <i class="bi bi-house"></i>
                 </a>
 
-                <!-- Botón de recargar página -->
                 <button class="nav-link btn btn-link text-white nav-icons-big" onclick="window.location.reload();">
                     <i class="bi bi-arrow-clockwise"></i>
                 </button>
@@ -229,8 +228,7 @@
             // Bloquear la tecla Enter (código 13)
             if (event.key === 'Enter') {
                 event.preventDefault();
-                // Opcional: puedes mostrar una alerta o feedback al usuario
-                // alert('La tecla Enter está deshabilitada en esta página');
+                
             }
         });
     </script>

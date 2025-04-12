@@ -1,5 +1,5 @@
 <?php
-ob_start(); // Inicia el buffer de salida
+ob_start();
 
 if (isset($_COOKIE['user_session'])) {
     // Decodificar la cookie
@@ -335,7 +335,6 @@ include('header.php')
                 <th>ID</th>
                 <th>Producto</th>
                 <th>Teléfono</th>
-
                 <th>Precio</th>
                 <th>Moneda</th>
                 <th>Cantidad</th>
@@ -362,7 +361,7 @@ include('header.php')
                     </td>
                 </tr>
             <?php endforeach;
-            ob_end_flush(); // Envía el buffer al final
+            ob_end_flush(); 
             ?>
 
         </tbody>
