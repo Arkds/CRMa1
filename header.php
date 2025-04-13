@@ -97,7 +97,6 @@
         }
     </style>
     <!-- Bootstrap JS y dependencias -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 </head>
 
@@ -179,7 +178,10 @@
                     <button class="nav-link btn btn-link text-white nav-icons" id="liveAlertBtn">
                         <i class="bi bi-question-circle"></i>
                     </button>
-
+                    <button class="nav-link btn btn-link text-white nav-icons"
+                        onclick="window.location.href='graphs.php';">
+                        <i class="bi bi-bar-chart-line""></i>
+                    </button>
                     <button class="nav-link btn btn-link text-white nav-icons"
                         onclick="window.location.href='logout.php';">
                         <i class="bi bi-box-arrow-right"></i>
@@ -228,7 +230,7 @@
             // Bloquear la tecla Enter (código 13)
             if (event.key === 'Enter') {
                 event.preventDefault();
-                
+
             }
         });
     </script>

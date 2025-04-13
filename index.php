@@ -11,6 +11,7 @@ if (isset($_COOKIE['user_session'])) {
         $user_id = $user_data['user_id'];
         $username = $user_data['username'];
         $role = $user_data['role'];
+        $isAdmin = ($role === 'admin'); // Definimos $isAdmin aquí
     } else {
         // Si hay un problema con la cookie, redirigir al login
         header("Location: login.php");
@@ -21,113 +22,136 @@ if (isset($_COOKIE['user_session'])) {
     header("Location: login.php");
     exit;
 }
+
 ////////////productos relevantes///////
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-// Verificar si es una solicitud AJAX para obtener los productos relevantes
-
+// Obtener productos relevantes
 $products = $pdo->query("SELECT relevance, name, price, description FROM products ORDER BY relevance DESC, name ASC")->fetchAll();
 
-///////////////////
-
-// Obtener el nombre del usuario desde la cookie
-$isAdmin = ($role === 'admin'); // Ahora usamos $role desde la cookie
-
-// Consultar ventas
+// Consultar ventas (solo para la tabla que no se usa actualmente)
 $stmt = $pdo->query("SELECT * FROM sales ORDER BY created_at DESC");
 $sales = $stmt->fetchAll();
 
-?>
+// Definir constantes por horas semanales (ajustables)
+$user_constants = [
+    'Sheyla' => 0.83,
+    'Magaly' => 1.11,
+    'Sonaly' => 1.11,
+    'Frank' => 0.77,
+    'Esther' => 1.33,
+];
 
-<?php
-// Obtener todas las ventas diarias para paginación
-$salesByDay = $pdo->query("
-    SELECT DATE(created_at) AS fecha, SUM(quantity) AS total_cantidad 
-    FROM sales 
-    GROUP BY fecha 
-    ORDER BY fecha ASC
-")->fetchAll(PDO::FETCH_ASSOC);
+// Inicializar estructura de resultados
+$puntos_usuarios = [];
 
-// Convertir datos a JSON para JavaScript
-$salesDataJson = json_encode($salesByDay);
-// Obtener la cantidad de clientes por estado
-$clientsByStatus = $pdo->query("
-    SELECT status, COUNT(*) AS total 
-    FROM report_clients 
-    GROUP BY status 
-    ORDER BY FIELD(status, 'Nuevo', 'Interesado', 'Negociación', 'Comprometido', 'Vendido', 'Perdido')
-")->fetchAll(PDO::FETCH_ASSOC);
+// Calcular ventas válidas (última semana, >= 29.90)
+$fecha_inicio = date('Y-m-d H:i:s', strtotime('-7 days'));
+$fecha_fin = date('Y-m-d H:i:s');
 
-// Convertir los datos a JSON para pasarlos a JavaScript
-$clientsByStatusJson = json_encode($clientsByStatus);
-
-// Consulta SQL para obtener la cantidad de clientes ingresados por usuario
-$clientsByUser = $pdo->query("
-    SELECT u.username, COUNT(rc.id) AS total_clientes
-    FROM report_clients rc
-    JOIN reports r ON rc.report_id = r.id
-    JOIN users u ON r.user_id = u.id
+$stmt = $pdo->prepare("
+    SELECT u.username, COUNT(c.id) AS total_ventas
+    FROM commissions c
+    JOIN users u ON c.user_id = u.id
+    WHERE c.created_at BETWEEN :inicio AND :fin
+    
     GROUP BY u.username
-    ORDER BY total_clientes DESC;
-")->fetchAll(PDO::FETCH_ASSOC);
+");
 
-// Convertir los datos a JSON para usarlos en JavaScript
-$clientsByUserJson = json_encode($clientsByUser);
+$stmt->execute(['inicio' => $fecha_inicio, 'fin' => $fecha_fin]);
+$ventas_comisionadas = $stmt->fetchAll();
+
+foreach ($ventas_comisionadas as $row) {
+    $nombre = $row['username'];
+    $ventas = (int) $row['total_ventas'];
+    $puntos_base = $ventas * 100;
+    $constante = $user_constants[$nombre] ?? 1;
+    $puntos_norm = round($puntos_base * $constante);
+
+    $puntos_usuarios[] = [
+        'nombre' => $nombre,
+        'ventas' => $ventas,
+        'puntos_base' => $puntos_base,
+        'constante' => $constante,
+        'puntos_normalizados' => $puntos_norm
+    ];
+}
 
 
 
 
-$query = "
-WITH words_extracted AS (
+$stmt_ventas = $pdo->prepare("
     SELECT 
-        LOWER(content) AS curso
-    FROM report_entries
-    WHERE category = 'cursos_mas_vendidos'
-)
+        u.username, 
+        COUNT(s.id) AS total_ventas,
+        SUM(s.price * s.quantity) AS monto_total,
+        s.currency
+    FROM sales s
+    JOIN users u ON s.user_id = u.id
+    WHERE s.created_at BETWEEN :inicio AND :fin
+    AND (
+        (s.currency = 'MXN' AND s.price >= 149) OR
+        (s.currency = 'PEN' AND s.price >= 29.80)
+    )
+    GROUP BY u.username, s.currency
+");
+$stmt_ventas->execute(['inicio' => $fecha_inicio, 'fin' => $fecha_fin]);
+$ventas_validas = $stmt_ventas->fetchAll();
 
-SELECT word, COUNT(*) AS total_menciones
-FROM (
-    SELECT SUBSTRING_INDEX(SUBSTRING_INDEX(curso, ' ', n), ' ', -1) AS word
-    FROM words_extracted
-    JOIN (SELECT 1 AS n UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6) numbers
-) extracted_words
-WHERE LENGTH(word) > 3
-AND word NOT IN ('wsp', 'tx', 'hz', 'prm', 'curso', 'cursos', 'para', 'en', 'el', 'de', 'la', 'los', 'las', 'y', 'premium', 'hazla')
-GROUP BY word
-ORDER BY total_menciones DESC
-LIMIT 10;
-";
+// Procesamiento de ventas no promocionales
+$ventas_por_usuario = [];
+foreach ($ventas_validas as $venta) {
+    $username = $venta['username'];
 
-$stmt = $pdo->query($query);
-$wordsData = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if (!isset($ventas_por_usuario[$username])) {
+        $ventas_por_usuario[$username] = [
+            'ventas_mxn' => 0,
+            'monto_mxn' => 0,
+            'ventas_pen' => 0,
+            'monto_pen' => 0
+        ];
+    }
 
-// Convertir los datos a JSON para usarlos en el gráfico
-$wordsDataJson = json_encode($wordsData);
+    if ($venta['currency'] === 'MXN') {
+        $ventas_por_usuario[$username]['ventas_mxn'] = (int) $venta['total_ventas'];
+        $ventas_por_usuario[$username]['monto_mxn'] = (float) $venta['monto_total'];
+    } else {
+        $ventas_por_usuario[$username]['ventas_pen'] = (int) $venta['total_ventas'];
+        $ventas_por_usuario[$username]['monto_pen'] = (float) $venta['monto_total'];
+    }
+}
 
+// Cálculo de puntos para ventas no promocionales
+// Cálculo CORREGIDO de puntos para ventas no promocionales
+$puntos_ventas = [];
+foreach ($ventas_por_usuario as $username => $datos) {
+    $constante = $user_constants[$username] ?? 1;
 
+    // Calculamos puntos según la fórmula mostrada (no por rangos)
+    $puntos_mxn = $datos['monto_mxn'] / 100;
+    $puntos_pen = ($datos['monto_pen'] * 5) / 100; // Conversión 1 PEN = 5 MXN
+    $puntos_base = round($puntos_mxn + $puntos_pen);
 
-/// Consulta SQL para obtener los productos más vendidos, normalizados a minúsculas
-$query = "
-SELECT LOWER(product_name) AS normalized_product_name, COUNT(*) AS total_vendidos
-FROM sales
-GROUP BY normalized_product_name
-ORDER BY total_vendidos DESC
-LIMIT 10;
-";
-
-$stmt = $pdo->query($query);
-$productsData = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Convertir los datos a JSON para usarlos en el gráfico
-$productsDataJson = json_encode($productsData);
-include('header.php')
-    ?>
-
+    $puntos_ventas[] = [
+        'nombre' => $username,
+        'ventas_mxn' => $datos['ventas_mxn'],
+        'monto_mxn' => number_format($datos['monto_mxn'], 2),
+        'ventas_pen' => $datos['ventas_pen'],
+        'monto_pen' => number_format($datos['monto_pen'], 2),
+        'puntos_base' => $puntos_base,
+        'constante' => $constante,
+        'puntos_normalizados' => round($puntos_base * $constante)
+    ];
+}
+// Ordenar ambos arrays por puntos normalizados (descendente)
+usort($puntos_usuarios, fn($a, $b) => $b['puntos_normalizados'] - $a['puntos_normalizados']);
+usort($puntos_ventas, fn($a, $b) => $b['puntos_normalizados'] - $a['puntos_normalizados']);
+include('header.php');
+?>
 
 <div class="container mt-5">
     <div id="liveAlertPlaceholder"></div>
-    <!--    <button type="button" class="btn btn-outline-dark float-end" id="liveAlertBtn">Ayuda</button>-->
 
     <script>
         const alertPlaceholder = document.getElementById('liveAlertPlaceholder')
@@ -165,95 +189,13 @@ include('header.php')
             })
         }
     </script>
-    <div class="container">
-        <!--<button class="btn btn-outline-danger" onclick="window.location.href='logout.php';">Cerrar Sesión</button>-->
 
+    <div class="container">
         <h1 class="text-center">Bienvenido(a), <?= htmlspecialchars($username) ?> 👋</h1>
         <hr>
     </div>
-    <!-- Botones de navegación 
-    <div class="d-flex flex-wrap gap-2 justify-content-center justify-content-md-between mb-3">
-        <?php if ($isAdmin): ?>
-            <a href="user_crud.php" class="btn btn-primary d-flex align-items-center">
-                <i class="bi bi-people-fill me-2"></i> Gestionar Usuarios
-            </a>
-        <?php endif; ?>
 
-        <div class="dropdown" onmouseover="openDropdown(this)" onmouseleave="closeDropdown(this)">
-            <button class="btn btn-secondary d-flex align-items-center dropdown-toggle" id="dropdownGestionarProductos"
-                data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="bi bi-box-seam me-2"></i> Productos
-            </button>
-            <ul class="dropdown-menu" aria-labelledby="dropdownGestionarProductos">
-                <li><button class="dropdown-item" onclick="window.location.href='product_crud.php'">Gestionar (admin)
-                        </button></li>
-                <li><button class="dropdown-item" onclick="window.location.href='syllabus_crud.php'">Temarios</button></li>
-            </ul>
-        </div>
-
-        <?php if ($isAdmin): ?>
-            <button class="btn btn-info d-flex align-items-center" onclick="window.location.href='report_sales.php';">
-            <i class="bi bi-bar-chart-line me-2"></i> Reportes Ventas
-        </button>
-        <?php endif; ?>
-
-        
-
-        <button class="btn btn-success d-flex align-items-center" onclick="window.location.href='sales_crud.php';">
-            <i class="bi bi-cash-stack me-2"></i> Registrar Ventas
-        </button>
-
-        <button class="btn btn-warning d-flex align-items-center" onclick="window.location.href='members_crud.php';">
-            <i class="bi bi-person-badge me-2"></i> Gestionar Socios
-        </button>
-
-        <button class="btn btn-danger d-flex align-items-center" onclick="window.location.href='report_crud.php';">
-            <i class="bi bi-clipboard-data me-2"></i> Reportes
-        </button>
-
-        <button class="btn btn-dark d-flex align-items-center" onclick="window.location.href='tracin_crud.php';">
-            <i class="bi bi-journal-check me-2"></i> Seguimientos
-        </button>
-    </div>-->
-    <script>
-        function openDropdown(element) {
-            let dropdownMenu = element.querySelector('.dropdown-menu');
-            dropdownMenu.classList.add('show');
-        }
-
-        function closeDropdown(element) {
-            let dropdownMenu = element.querySelector('.dropdown-menu');
-            dropdownMenu.classList.remove('show');
-        }
-    </script>
-
-
-    <!-- Tabla de ventas 
-        <h2>Ventas Registradas</h2>
-        <table id="salesTable" class="table table-striped">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Producto</th>
-                    <th>Precio</th>
-                    <th>Cantidad</th>
-                    <th>Total</th>
-                    <th>Fecha</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($sales as $sale): ?>
-                    <tr>
-                        <td><?= $sale['id'] ?></td>
-                        <td><?= htmlspecialchars($sale['product_name']) ?></td>
-                        <td><?= htmlspecialchars($sale['price']) ?></td>
-                        <td><?= htmlspecialchars($sale['quantity']) ?></td>
-                        <td><?= number_format($sale['price'] * $sale['quantity'], 2) ?></td>
-                        <td><?= htmlspecialchars($sale['created_at']) ?></td>
-                    </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>-->
+    <!-- Tabla de productos relevantes -->
     <div class="container mt-4">
         <div class="col">
             <section class="card p-3">
@@ -279,389 +221,105 @@ include('header.php')
                         <?php endforeach; ?>
                     </tbody>
                 </table>
-
             </section>
         </div>
 
-        <div class="row g-4"> <!-- Grid con separación entre elementos -->
+        <?php if (!empty($puntos_usuarios)): ?>
+            <section class="card p-3 mt-4">
+                <h2 class="text-center">Puntaje Semanal por Ventas con Comisión</h2>
+                <table class="table table-bordered table-striped">
+                    <thead>
+                        <tr>
+                            <th>Vendedor</th>
+                            <th>Ventas con comisión</th>
+                            <th>Puntos base</th>
+                            <th>Constante</th>
+                            <th>Puntos normalizados</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($puntos_usuarios as $pu): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($pu['nombre']) ?></td>
+                                <td><?= $pu['ventas'] ?></td>
+                                <td><?= $pu['puntos_base'] ?></td>
+                                <td><?= $pu['constante'] ?></td>
+                                <td><strong><?= $pu['puntos_normalizados'] ?></strong></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </section>
+        <?php endif; ?>
 
-            <div class="col-md-6">
-                <section class="card p-3">
-                    <h2 class="text-center">Clientes Potenciales por Vendedor</h2>
-                    <canvas id="clientsUserChart"></canvas>
-                </section>
-            </div>
-            <div class="col-md-6">
-                <section class="card p-3">
-                    <h2 class="text-center">Clientes Potenciales por Estado</h2>
-                    <canvas id="clientsChart"></canvas>
-                </section>
-            </div>
-            <?php if ($isAdmin): ?>
-                <div class="col-md-6">
-                    <section class="card p-3">
-                        <h2 class="text-center">Cantidad de Productos Vendidos por Día</h2>
-                        <canvas id="salesChart"></canvas>
-                        <div class="mt-3 text-center">
-                            <button id="prevBtn" class="btn btn-primary">← 30 días anteriores</button>
-                            <button id="nextBtn" class="btn btn-primary" disabled>30 días siguientes →</button>
-                        </div>
-                    </section>
+        <!-- Botón para mostrar/ocultar gráficos -->
+        <div class="text-center mb-3">
+            <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#graphsContainer"
+                aria-expanded="false" aria-controls="graphsContainer" id="toggleGraphsBtn">
+                Mostrar Gráficos
+            </button>
+        </div>
+        <?php if (!empty($puntos_ventas)): ?>
+            <section class="card p-3 mt-4">
+                <h2 class="text-center">Puntaje por Ventas No Promocionales</h2>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Vendedor</th>
+                                <th colspan="2" class="text-center">Ventas en MXN (≥149)</th>
+                                <th colspan="2" class="text-center">Ventas en PEN (≥29.80)</th>
+                                <th>Puntos Base</th>
+                                <th>Constante</th>
+                                <th>Puntos Finales</th>
+                            </tr>
+                            <tr>
+                                <th></th>
+                                <th>Cantidad</th>
+                                <th>Monto Total</th>
+                                <th>Cantidad</th>
+                                <th>Monto Total</th>
+                                <th></th>
+                                <th></th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($puntos_ventas as $pv): ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($pv['nombre']) ?></td>
+                                    <td><?= $pv['ventas_mxn'] ?></td>
+                                    <td>$<?= $pv['monto_mxn'] ?> MXN</td>
+                                    <td><?= $pv['ventas_pen'] ?></td>
+                                    <td>S/<?= $pv['monto_pen'] ?></td>
+                                    <td><?= $pv['puntos_base'] ?></td>
+                                    <td><?= $pv['constante'] ?></td>
+                                    <td><strong class="text-primary"><?= $pv['puntos_normalizados'] ?></strong></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
-            <?php endif; ?>
-
-            <?php if ($isAdmin): ?>
-                <div class="col-md-6">
-                    <section class="card p-3">
-                        <h2 class="text-center">Cursos más vendidos según reportes</h2>
-                        <canvas id="wordsChart"></canvas>
-                    </section>
+                <div class="alert alert-info mt-3">
+                    <strong>Fórmula:</strong>
+                    <ul>
+                        <li>Puntos MXN = Monto Total MXN / 100</li>
+                        <li>Puntos PEN = (Monto Total PEN × 5) / 100</li>
+                        <li>Puntos Base = Puntos MXN + Puntos PEN</li>
+                        <li>Puntos Finales = Puntos Base × Constante Individual</li>
+                    </ul>
                 </div>
-            <?php endif; ?>
+            </section>
+        <?php endif; ?>
 
-
-
+        <!-- Contenedor colapsable para los gráficos -->
+        <div class="collapse" id="graphsContainer">
+            <?php include('graphs.php'); ?>
         </div>
     </div>
-    <br>
-    <?php if ($isAdmin): ?>
-        <section class="card p-3">
-            <h2>Productos Más Vendidos</h2>
-            <canvas id="productsChart"></canvas>
-        </section>
-    <?php endif; ?>
-
-
-
 </div>
 
-<!-- Inicialización de DataTables 
-    <script>
-        $(document).ready(function () {
-            $('#salesTable').DataTable({
-                paging: true,
-                searching: true,
-                ordering: true,
-                order: [[5, 'desc']], 
-                language: {
-                    url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
-                }
-            });
-        });
-    </script>-->
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
-    integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
-    crossorigin="anonymous"></script>
-<script>
-    setInterval(() => {
-        fetch('keep-alive.php')
-            .then(response => console.log('Sesión actualizada'));
-    }, 300000); // 5 minutos
-</script>
-
-
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        const salesData = <?= $salesDataJson ?>; // Datos de ventas desde PHP
-        const labels = salesData.map(item => item.fecha);
-        const values = salesData.map(item => item.total_cantidad);
-
-        let startIndex = Math.max(0, labels.length - 30); // Mostrar últimos 30 días por defecto
-        let endIndex = labels.length;
-
-        const ctx = document.getElementById('salesChart').getContext('2d');
-        let salesChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels.slice(startIndex, endIndex),
-                datasets: [{
-                    label: 'Cantidad Vendida por Día',
-                    data: values.slice(startIndex, endIndex),
-                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
-                    borderColor: 'rgba(54, 162, 235, 1)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.5,
-                    pointRadius: 6, // Tamaño de los puntos
-                    pointHoverRadius: 8, // Tamaño al pasar el mouse
-                    pointBackgroundColor: 'rgba(54, 162, 235, 1)', // Color del punto
-                    pointBorderColor: 'rgba(255, 255, 255, 1)', // Borde blanco
-                    pointBorderWidth: 2 // Grosor del borde del punto
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: { display: true, position: 'top' }
-                },
-                scales: {
-                    x: { title: { display: true, text: 'Fecha' } },
-                    y: { beginAtZero: true, title: { display: true, text: 'Cantidad de Productos Vendidos' } }
-                }
-            }
-        });
-        // Función para actualizar el gráfico
-        function updateChart() {
-            salesChart.data.labels = labels.slice(startIndex, endIndex);
-            salesChart.data.datasets[0].data = values.slice(startIndex, endIndex);
-            salesChart.update();
-            document.getElementById('nextBtn').disabled = (endIndex >= labels.length);
-            document.getElementById('prevBtn').disabled = (startIndex <= 0);
-        }
-        // Botón para ver 30 días anteriores
-        document.getElementById('prevBtn').addEventListener('click', function () {
-            if (startIndex > 0) {
-                startIndex = Math.max(0, startIndex - 30);
-                endIndex = Math.max(30, endIndex - 30);
-                updateChart();
-            }
-        });
-        // Botón para ver 30 días siguientes
-        document.getElementById('nextBtn').addEventListener('click', function () {
-            if (endIndex < labels.length) {
-                startIndex = Math.min(labels.length - 30, startIndex + 30);
-                endIndex = Math.min(labels.length, endIndex + 30);
-                updateChart();
-            }
-        });
-    });
-</script>
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        const clientsData = <?= $clientsByStatusJson ?>;
-
-        // Extraer etiquetas (estados) y valores (cantidad de clientes)
-        const labels = clientsData.map(item => item.status);
-        const values = clientsData.map(item => item.total);
-
-        const ctx = document.getElementById('clientsChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'doughnut', // Cambiado de 'polarArea' a 'doughnut'
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Clientes Potenciales',
-                    data: values,
-                    backgroundColor: [
-                        'rgba(54, 162, 235, 0.5)',  // Nuevo
-                        'rgba(255, 206, 86, 0.5)',  // Interesado
-                        'rgba(75, 192, 192, 0.5)',  // Negociación
-                        'rgba(153, 102, 255, 0.5)', // Comprometido
-                        'rgba(46, 204, 113, 0.5)',  // Vendido
-                        'rgba(231, 76, 60, 0.5)'    // Perdido
-                    ],
-                    borderColor: [
-                        'rgba(54, 162, 235, 1)',
-                        'rgba(255, 206, 86, 1)',
-                        'rgba(75, 192, 192, 1)',
-                        'rgba(153, 102, 255, 1)',
-                        'rgba(46, 204, 113, 1)',
-                        'rgba(231, 76, 60, 1)'
-                    ],
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: { display: true, position: 'top' },
-                    tooltip: {
-                        callbacks: {
-                            label: function (tooltipItem) {
-                                return `${tooltipItem.label}: ${tooltipItem.raw} clientes`;
-                            }
-                        }
-                    }
-                },
-                cutout: '50%', // Hace que el centro sea más visible
-                rotation: -90, // Ajusta la rotación para mejor visualización
-                animation: {
-                    animateRotate: true,
-                    animateScale: true
-                }
-            }
-        });
-    });
-</script>
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        const clientsByUser = <?= $clientsByUserJson ?>; // Datos desde PHP
-
-        // Extraer etiquetas (nombres de usuarios) y valores (cantidad de clientes)
-        const labels = clientsByUser.map(item => item.username);
-        const values = clientsByUser.map(item => item.total_clientes);
-
-        const ctx = document.getElementById('clientsUserChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'polarArea',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Clientes Potenciales por Usuario',
-                    data: values,
-                    backgroundColor: [
-                        'rgba(54, 162, 235, 0.5)',  // Azul
-                        'rgba(255, 206, 86, 0.5)',  // Amarillo
-                        'rgba(75, 192, 192, 0.5)',  // Verde
-                        'rgba(153, 102, 255, 0.5)', // Púrpura
-                        'rgba(231, 76, 60, 0.5)'    // Rojo
-                    ],
-                    borderColor: [
-                        'rgba(54, 162, 235, 1)',
-                        'rgba(255, 206, 86, 1)',
-                        'rgba(75, 192, 192, 1)',
-                        'rgba(153, 102, 255, 1)',
-                        'rgba(231, 76, 60, 1)'
-                    ],
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: { display: true, position: 'top' },
-                    datalabels: {
-                        color: 'black',
-                        font: { size: 14, weight: 'bold' },
-                        formatter: (value, context) => {
-                            return context.chart.data.labels[context.dataIndex]; // Solo el nombre del usuario
-                        },
-                        anchor: 'center',
-                        align: 'center',
-                        offset: function (context) {
-                            const meta = context.chart.getDatasetMeta(0);
-                            const arc = meta.data[context.dataIndex];
-                            return arc ? arc.outerRadius / 2.5 : 0; // Centrar la etiqueta en el arco
-                        }
-                    }
-                },
-                scales: {
-                    r: {
-                        pointLabels: {
-                            display: true,
-                            centerPointLabels: true, // Centra los labels en los arcos
-                            font: { size: 14 }
-                        },
-                        ticks: { display: true } // Oculta los valores de radio
-                    }
-                }
-            },
-        });
-    });
-</script>
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        const wordsData = <?= $wordsDataJson ?>; // Datos desde PHP
-
-        // Extraer etiquetas (palabras) y valores (cantidad de menciones)
-        const labels = wordsData.map(item => item.word);
-        const values = wordsData.map(item => item.total_menciones);
-
-        const ctx = document.getElementById('wordsChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'bar', // Gráfico de barras horizontales
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Número de Menciones',
-                    data: values,
-                    backgroundColor: 'rgba(75, 192, 192, 0.5)',
-                    borderColor: 'rgba(75, 192, 192, 1)',
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                indexAxis: 'y', // Hace que el gráfico sea horizontal
-                plugins: {
-                    legend: { display: false }, // Ocultar leyenda innecesaria
-                    tooltip: {
-                        callbacks: {
-                            label: function (tooltipItem) {
-                                return `${tooltipItem.label}: ${tooltipItem.raw} veces`;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: { title: { display: true, text: 'Cantidad de Menciones' } },
-                    y: { title: { display: true, text: ' Cursos' } }
-                }
-            }
-        });
-    });
-</script>
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        const productsData = <?= $productsDataJson ?>; // Datos desde PHP
-
-        // Extraer etiquetas (nombres de productos) y valores (total vendidos)
-        const labels = productsData.map(item => item.normalized_product_name);
-        const values = productsData.map(item => item.total_vendidos);
-
-        const ctx = document.getElementById('productsChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'bar', // Tipo de gráfico: Barras
-            data: {
-                labels: labels, // Etiquetas (productos)
-                datasets: [{
-                    label: 'Productos Más Vendidos',
-                    data: values, // Datos de ventas
-                    backgroundColor: [
-                        'rgba(54, 162, 235, 0.6)',  // Color para el primer producto
-                        'rgba(255, 206, 86, 0.6)',  // Color para el segundo producto
-                        'rgba(75, 192, 192, 0.6)',  // Color para el tercer producto
-                        'rgba(153, 102, 255, 0.6)', // Color para el cuarto producto
-                        'rgba(231, 76, 60, 0.6)',   // Color para el quinto producto
-                        'rgba(46, 204, 113, 0.6)',  // Color para el sexto producto
-                        'rgba(255, 99, 132, 0.6)',  // Color para el séptimo producto
-                        'rgba(255, 159, 64, 0.6)',  // Color para el octavo producto
-                        'rgba(255, 99, 132, 0.6)',  // Color para el noveno producto
-                        'rgba(54, 162, 235, 0.6)'   // Color para el décimo producto
-                    ],
-                    borderColor: [
-                        'rgba(54, 162, 235, 1)',
-                        'rgba(255, 206, 86, 1)',
-                        'rgba(75, 192, 192, 1)',
-                        'rgba(153, 102, 255, 1)',
-                        'rgba(231, 76, 60, 1)',
-                        'rgba(46, 204, 113, 1)',
-                        'rgba(255, 99, 132, 1)',
-                        'rgba(255, 159, 64, 1)',
-                        'rgba(255, 99, 132, 1)',
-                        'rgba(54, 162, 235, 1)'
-                    ],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    x: {
-                        stacked: true, // Hacer que las barras sean apiladas
-                        title: { display: true, text: 'Productos' }
-                    },
-                    y: {
-                        stacked: true, // Hacer que las barras sean apiladas
-                        beginAtZero: true, // Comienza desde cero
-                        title: { display: true, text: 'Cantidad de Ventas' }
-                    }
-                },
-                plugins: {
-                    legend: { display: true, position: 'top' },
-                    tooltip: {
-                        callbacks: {
-                            label: function (tooltipItem) {
-                                return `${tooltipItem.label}: ${tooltipItem.raw} ventas`;
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    });
-</script>
+<!-- Script para DataTables de la tabla de productos -->
 <script>
     $(document).ready(function () {
         $('#relevantProductsTable').DataTable({
@@ -672,8 +330,22 @@ include('header.php')
                 url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
             }
         });
+
+        // Cambiar el texto del botón cuando se muestra/ocultan los gráficos
+        $('#graphsContainer').on('show.bs.collapse', function () {
+            $('#toggleGraphsBtn').text('Ocultar Gráficos');
+        }).on('hide.bs.collapse', function () {
+            $('#toggleGraphsBtn').text('Mostrar Gráficos');
+        });
     });
 </script>
-</body>
 
-</html>
+<!-- Script para mantener la sesión activa -->
+<script>
+    setInterval(() => {
+        fetch('keep-alive.php')
+            .then(response => console.log('Sesión actualizada'));
+    }, 300000); // 5 minutos
+</script>
+
+<?php include('footer.php'); ?>
