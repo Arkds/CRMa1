@@ -1,40 +1,6 @@
 <?php
-require 'db.php';
+require 'datos_index.php';
 
-// Verificar si la cookie de sesión existe
-if (isset($_COOKIE['user_session'])) {
-    // Decodificar la cookie
-    $user_data = json_decode(base64_decode($_COOKIE['user_session']), true);
-
-    if ($user_data) {
-        // Variables disponibles para usar en la página
-        $user_id = $user_data['user_id'];
-        $username = $user_data['username'];
-        $role = $user_data['role'];
-        $isAdmin = ($role === 'admin'); // Definimos $isAdmin aquí
-    } else {
-        // Si hay un problema con la cookie, redirigir al login
-        header("Location: login.php");
-        exit;
-    }
-} else {
-    // Si no hay cookie, redirigir al login
-    header("Location: login.php");
-    exit;
-}
-
-////////////productos relevantes///////
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-
-// Obtener productos relevantes
-$products = $pdo->query("SELECT relevance, name, price, description FROM products ORDER BY relevance DESC, name ASC")->fetchAll();
-
-// Consultar ventas (solo para la tabla que no se usa actualmente)
-$stmt = $pdo->query("SELECT * FROM sales ORDER BY created_at DESC");
-$sales = $stmt->fetchAll();
-
-// Definir constantes por horas semanales (ajustables)
 $user_constants = [
     'Sheyla' => 0.83,
     'Magaly' => 1.11,
@@ -42,111 +8,6 @@ $user_constants = [
     'Frank' => 0.77,
     'Esther' => 1.33,
 ];
-
-// Inicializar estructura de resultados
-$puntos_usuarios = [];
-
-// Calcular ventas válidas (última semana, >= 29.90)
-$fecha_inicio = date('Y-m-d H:i:s', strtotime('-7 days'));
-$fecha_fin = date('Y-m-d H:i:s');
-
-$stmt = $pdo->prepare("
-    SELECT u.username, COUNT(c.id) AS total_ventas
-    FROM commissions c
-    JOIN users u ON c.user_id = u.id
-    WHERE c.created_at BETWEEN :inicio AND :fin
-    
-    GROUP BY u.username
-");
-
-$stmt->execute(['inicio' => $fecha_inicio, 'fin' => $fecha_fin]);
-$ventas_comisionadas = $stmt->fetchAll();
-
-foreach ($ventas_comisionadas as $row) {
-    $nombre = $row['username'];
-    $ventas = (int) $row['total_ventas'];
-    $puntos_base = $ventas * 100;
-    $constante = $user_constants[$nombre] ?? 1;
-    $puntos_norm = round($puntos_base * $constante);
-
-    $puntos_usuarios[] = [
-        'nombre' => $nombre,
-        'ventas' => $ventas,
-        'puntos_base' => $puntos_base,
-        'constante' => $constante,
-        'puntos_normalizados' => $puntos_norm
-    ];
-}
-
-
-
-
-$stmt_ventas = $pdo->prepare("
-    SELECT 
-        u.username, 
-        COUNT(s.id) AS total_ventas,
-        SUM(s.price * s.quantity) AS monto_total,
-        s.currency
-    FROM sales s
-    JOIN users u ON s.user_id = u.id
-    WHERE s.created_at BETWEEN :inicio AND :fin
-    AND (
-        (s.currency = 'MXN' AND s.price >= 149) OR
-        (s.currency = 'PEN' AND s.price >= 29.80)
-    )
-    GROUP BY u.username, s.currency
-");
-$stmt_ventas->execute(['inicio' => $fecha_inicio, 'fin' => $fecha_fin]);
-$ventas_validas = $stmt_ventas->fetchAll();
-
-// Procesamiento de ventas no promocionales
-$ventas_por_usuario = [];
-foreach ($ventas_validas as $venta) {
-    $username = $venta['username'];
-
-    if (!isset($ventas_por_usuario[$username])) {
-        $ventas_por_usuario[$username] = [
-            'ventas_mxn' => 0,
-            'monto_mxn' => 0,
-            'ventas_pen' => 0,
-            'monto_pen' => 0
-        ];
-    }
-
-    if ($venta['currency'] === 'MXN') {
-        $ventas_por_usuario[$username]['ventas_mxn'] = (int) $venta['total_ventas'];
-        $ventas_por_usuario[$username]['monto_mxn'] = (float) $venta['monto_total'];
-    } else {
-        $ventas_por_usuario[$username]['ventas_pen'] = (int) $venta['total_ventas'];
-        $ventas_por_usuario[$username]['monto_pen'] = (float) $venta['monto_total'];
-    }
-}
-
-// Cálculo de puntos para ventas no promocionales
-// Cálculo CORREGIDO de puntos para ventas no promocionales
-$puntos_ventas = [];
-foreach ($ventas_por_usuario as $username => $datos) {
-    $constante = $user_constants[$username] ?? 1;
-
-    // Calculamos puntos según la fórmula mostrada (no por rangos)
-    $puntos_mxn = $datos['monto_mxn'] / 100;
-    $puntos_pen = ($datos['monto_pen'] * 5) / 100; // Conversión 1 PEN = 5 MXN
-    $puntos_base = round($puntos_mxn + $puntos_pen);
-
-    $puntos_ventas[] = [
-        'nombre' => $username,
-        'ventas_mxn' => $datos['ventas_mxn'],
-        'monto_mxn' => number_format($datos['monto_mxn'], 2),
-        'ventas_pen' => $datos['ventas_pen'],
-        'monto_pen' => number_format($datos['monto_pen'], 2),
-        'puntos_base' => $puntos_base,
-        'constante' => $constante,
-        'puntos_normalizados' => round($puntos_base * $constante)
-    ];
-}
-// Ordenar ambos arrays por puntos normalizados (descendente)
-usort($puntos_usuarios, fn($a, $b) => $b['puntos_normalizados'] - $a['puntos_normalizados']);
-usort($puntos_ventas, fn($a, $b) => $b['puntos_normalizados'] - $a['puntos_normalizados']);
 include('header.php');
 ?>
 
@@ -224,32 +85,660 @@ include('header.php');
             </section>
         </div>
 
-        <?php if (!empty($puntos_usuarios)): ?>
-            <section class="card p-3 mt-4">
-                <h2 class="text-center">Puntaje Semanal por Ventas con Comisión</h2>
-                <table class="table table-bordered table-striped">
+        <?php if ($role === 'admin'): ?>
+
+            <div class="card mt-3">
+                <div class="card-header bg-primary text-white">
+                    <small class="d-block">Puntos Finales = (Ventas × Puntos Base) × Constante (ajustada por
+                        dedicación)</small>
+                    <h3 class="mb-0">Puntos por Ventas con Comisión</h3>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Vendedor</th>
+                                <th>Ventas Registradas</th>
+                                <th>Puntos Base (100/venta)</th>
+                                <th>Constante</th>
+                                <th>Puntos Finales</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($puntos_comisiones as $pc): ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($pc['vendedor']) ?></td>
+                                    <td><?= $pc['ventas'] ?></td>
+                                    <td><?= $pc['puntos_base'] ?></td>
+                                    <td><?= $pc['constante'] ?>
+                                        <span class="badge bg-light text-dark" data-bs-toggle="tooltip"
+                                            title="Basado en horas trabajadas y antigüedad">
+                                            ⓘ
+                                        </span>
+                                    </td>
+                                    <td class="font-weight-bold"><?= $pc['puntos_finales'] ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+
+
+
+
+            <!-- TABLA DE PUNTOS POR VENTAS NORMALES -->
+            <div class="card mt-4">
+                <div class="card-header bg-success text-white">
+                    <small class="d-block">Puntos Finales = (Ventas × Puntos Base) × Constante (ajustada por
+                        dedicación)</small>
+                    <h3 class="mb-0">Puntos por Ventas Fuera de Promoción</h3>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Vendedor</th>
+                                <th>Ventas MXN (≥149)</th>
+                                <th>Ventas PEN (≥29.8)</th>
+                                <th>Total Ventas</th>
+                                <th>Puntos Base</th>
+                                <th>Constante</th>
+                                <th>Puntos Finales</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($puntos_ventas_normales as $pvn): ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($pvn['vendedor']) ?></td>
+                                    <td><?= $pvn['ventas_mxn'] ?></td>
+                                    <td><?= $pvn['ventas_pen'] ?></td>
+                                    <td><?= $pvn['total_ventas'] ?></td>
+                                    <td>
+                                        <?= $pvn['puntos_base'] ?>
+                                        <?php if ($pvn['puntos_finales'] >= 4500): ?>
+                                            <span class="badge bg-info">Rango 4500+ puntos</span>
+                                        <?php elseif ($pvn['puntos_finales'] >= 2000): ?>
+                                            <span class="badge bg-warning">Rango 2000+ puntos</span>
+                                        <?php endif; ?>
+                                    </td>
+
+
+                                    <td><?= $pvn['constante'] ?></td>
+                                    <td class="font-weight-bold"><?= $pvn['puntos_finales'] ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    <div class="progress mt-3">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar"
+                            style="width: <?= ($puntos_totales[$username] / 7500) * 100 ?>%">
+                            <?= $puntos_totales[$username] ?? 0 ?> / 7500 pts
+                        </div>
+                    </div>
+                    <div class="alert alert-info mt-3">
+                        <strong>Rangos de puntos:</strong>
+                        <ul>
+                            <li>10-19 ventas: 2,000 puntos</li>
+                            <li>20+ ventas: 4,500 puntos</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <!-- TABLA RESUMEN DE PUNTOS TOTALES -->
+            <div class="card mt-4">
+                <div class="card-header bg-info text-white">
+                    <h3 class="mb-0">Resumen General de Puntos</h3>
+                    <p class="mb-0"><small>Período evaluado: <?= $rango_fechas ?></small></p>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>Posición</th>
+                                    <th>Vendedor</th>
+                                    <th>Puntos Comisiones</th>
+                                    <th>Puntos Ventas Normales</th>
+                                    <th>Puntos Totales</th>
+                                    <th>Recompensa Alcanzada</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php
+                                $posicion = 1;
+                                foreach ($puntos_totales as $vendedor => $total):
+                                    // Obtener puntos por comisiones para este vendedor
+                                    $puntos_com = 0;
+                                    foreach ($puntos_comisiones as $pc) {
+                                        if ($pc['vendedor'] === $vendedor) {
+                                            $puntos_com = $pc['puntos_finales'];
+                                            break;
+                                        }
+                                    }
+
+                                    // Obtener puntos por ventas normales para este vendedor
+                                    $puntos_vn = 0;
+                                    foreach ($puntos_ventas_normales as $pvn) {
+                                        if ($pvn['vendedor'] === $vendedor) {
+                                            $puntos_vn = $pvn['puntos_finales'];
+                                            break;
+                                        }
+                                    }
+
+                                    // Determinar recompensa alcanzada
+                                    $recompensa = '';
+                                    if ($total >= 12000) {
+                                        $recompensa = '<span class="badge bg-success">Vale S/20</span>';
+                                    } elseif ($total >= 7500) {
+                                        $recompensa = '<span class="badge bg-primary">Suscripción app</span>';
+                                    } elseif ($total >= 5000) {
+                                        $recompensa = '<span class="badge bg-info">Recarga S/10</span>';
+                                    } elseif ($total >= 3000) {
+                                        $recompensa = '<span class="badge bg-warning">Recarga S/5</span>';
+                                    } else {
+                                        $recompensa = '<span class="badge bg-secondary">En progreso</span>';
+                                    }
+                                    ?>
+                                    <tr>
+                                        <td><?= $posicion++ ?></td>
+                                        <td><?= htmlspecialchars($vendedor) ?></td>
+                                        <td><?= number_format($puntos_com, 0) ?></td>
+                                        <td><?= number_format($puntos_vn, 0) ?></td>
+                                        <td class="font-weight-bold"><?= number_format($total, 0) ?></td>
+                                        <td><?= $recompensa ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-active">
+                                    <th colspan="2">Totales</th>
+                                    <th><?= number_format(array_sum(array_column($puntos_comisiones, 'puntos_finales')), 0) ?>
+                                    </th>
+                                    <th><?= number_format(array_sum(array_column($puntos_ventas_normales, 'puntos_finales')), 0) ?>
+                                    </th>
+                                    <th><?= number_format(array_sum($puntos_totales), 0) ?></th>
+                                    <th></th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <div class="mt-3 p-3 bg-light rounded">
+                        <h5>Detalles del Período:</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Ventas con Comisión</h6>
+                                <ul>
+                                    <li>100 puntos por cada venta registrada</li>
+                                    <li>Constantes aplicadas según carga horaria</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Ventas Normales</h6>
+                                <ul>
+                                    <li>180 puntos por cada venta fuera de promoción</li>
+                                    <li>Promoción: MXN &lt;150, PEN &lt;29.9</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        <?php endif; ?>
+        <!-- TABLA DE RECOMPENSAS ALCANZABLES -->
+        <div class="card mt-4">
+            <div class="card-header bg-warning">
+
+                <h3 class="mb-0">Recompensas Disponibles</h3>
+            </div>
+            <div class="card-body">
+                <table class="table">
                     <thead>
                         <tr>
-                            <th>Vendedor</th>
-                            <th>Ventas con comisión</th>
-                            <th>Puntos base</th>
-                            <th>Constante</th>
-                            <th>Puntos normalizados</th>
+                            <th>Puntos Requeridos</th>
+                            <th>Recompensa</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($puntos_usuarios as $pu): ?>
-                            <tr>
-                                <td><?= htmlspecialchars($pu['nombre']) ?></td>
-                                <td><?= $pu['ventas'] ?></td>
-                                <td><?= $pu['puntos_base'] ?></td>
-                                <td><?= $pu['constante'] ?></td>
-                                <td><strong><?= $pu['puntos_normalizados'] ?></strong></td>
-                            </tr>
-                        <?php endforeach; ?>
+                        <tr>
+                            <td>3,000</td>
+                            <td>Recarga de S/5 o snack sorpresa</td>
+                        </tr>
+                        <tr>
+                            <td>5,000</td>
+                            <td>Recarga de S/10 o canjeo de menú</td>
+                        </tr>
+                        <tr>
+                            <td>7,500</td>
+                            <td>Suscripción de un mes (app)</td>
+                        </tr>
+                        <tr>
+                            <td>12,000</td>
+                            <td>Vale digital de S/20</td>
+                        </tr>
                     </tbody>
                 </table>
-            </section>
+            </div>
+        </div>
+
+        <div class="container mt-5">
+            <?php if ($role === 'admin'): ?>
+                <!-- Dashboard completo para admin -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <canvas id="chartComisiones"></canvas>
+                    </div>
+                    <div class="col-md-6">
+                        <canvas id="chartVentasNormales"></canvas>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <canvas id="chartResumen"></canvas>
+                </div>
+            <?php else: ?>
+                <?php
+                // Datos del usuario actual
+                $puntos_usuario = $datos_para_mostrar['total'] ?? 0;
+                $recompensas = [
+                    3000 => "Recarga de S/5 o snack sorpresa",
+                    5000 => "Recarga de S/10 o canjeo de menú",
+                    7500 => "Suscripción de un mes (app)",
+                    12000 => "Vale digital de S/20"
+                ];
+
+                // Determinar recompensas alcanzadas y siguientes
+                $recompensas_alcanzadas = [];
+                $recompensas_pendientes = [];
+                $siguiente_recompensa = null;
+                $puntos_para_siguiente = 0;
+
+                foreach ($recompensas as $puntos => $descripcion) {
+                    if ($puntos_usuario >= $puntos) {
+                        $recompensas_alcanzadas[$puntos] = $descripcion;
+                    } else {
+                        if ($siguiente_recompensa === null) {
+                            $siguiente_recompensa = $puntos;
+                            $puntos_para_siguiente = $puntos - $puntos_usuario;
+                        }
+                        $recompensas_pendientes[$puntos] = $descripcion;
+                    }
+                }
+
+                // Si ha alcanzado todas, mostrar la última como próxima
+                if ($siguiente_recompensa === null && !empty($recompensas)) {
+                    end($recompensas);
+                    $siguiente_recompensa = key($recompensas);
+                    $puntos_para_siguiente = 0;
+                }
+                ?>
+                <!-- Vista personalizada para vendedores -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <canvas id="chartMiProgreso"></canvas>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Tus recompensas</h5>
+
+                                <?php if (!empty($recompensas_alcanzadas)): ?>
+                                    <div class="mb-3">
+                                        <h6 class="text-success">✅ Recompensas obtenidas</h6>
+                                        <ul class="list-group">
+                                            <?php foreach ($recompensas_alcanzadas as $puntos => $desc): ?>
+                                                <li class="list-group-item list-group-item-success">
+                                                    <strong><?= number_format($puntos) ?> pts:</strong> <?= $desc ?>
+                                                    <?php if (!$recompensa_reclamada): ?>
+                                                        <form method="POST" action="reclamar_recompensa.php"
+                                                            onsubmit="return confirm('¿Seguro que deseas reclamar esta recompensa?');">
+                                                            <input type="hidden" name="puntos" value="<?= $puntos_usuario ?>">
+                                                            <input type="hidden" name="descripcion"
+                                                                value="<?= $recompensas_alcanzadas[$siguiente_recompensa] ?? 'Recompensa alcanzada' ?>">
+                                                            <button class="btn btn-success mt-3" type="submit">🎁 Reclamar
+                                                                recompensa</button>
+                                                        </form>
+                                                    <?php else: ?>
+                                                        <div class="alert alert-success mt-3">✅ Ya reclamaste tu recompensa esta semana.
+                                                        </div>
+                                                    <?php endif; ?>
+
+                                                </li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                    </div>
+                                <?php endif; ?>
+
+                                <?php if (!empty($recompensas_pendientes)): ?>
+                                    <div>
+                                        <h6 class="text-primary">🎯 Próximas recompensas</h6>
+                                        <ul class="list-group">
+                                            <?php foreach ($recompensas_pendientes as $puntos => $desc): ?>
+                                                <li class="list-group-item">
+                                                    <strong><?= number_format($puntos) ?> pts:</strong> <?= $desc ?>
+                                                    <small class="text-muted d-block">
+                                                        <?php if ($puntos == $siguiente_recompensa): ?>
+                                                            <span class="text-primary">¡Faltan solo
+                                                                <?= number_format($puntos_para_siguiente) ?> puntos!</span>
+                                                        <?php else: ?>
+                                                            Falta: <?= number_format($puntos - $puntos_usuario) ?> pts
+                                                        <?php endif; ?>
+                                                    </small>
+                                                </li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
+        </div>
+        <?php if ($role === 'admin'): ?>
+            <div class="card mt-4">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">Competencia por Equipos</h3>
+                    <p class="mb-0"><small>Puntos calculados solo para ventas en horarios específicos + 15% bonus
+                            equipo</small></p>
+                </div>
+                <div class="card-body">
+                    <?php if (!empty($puntos_equipos)): ?>
+                        <div class="row">
+                            <?php
+                            $equipo_colors = [
+                                'mañana' => 'warning',
+                                'tarde' => 'info',
+                                'noche' => 'secondary',
+                                'fin_semana' => 'success'
+                            ];
+
+                            foreach ($puntos_equipos as $nombre => $equipo): ?>
+                                <div class="col-md-3">
+                                    <div class="card text-white bg-<?= $equipo_colors[$nombre] ?? 'primary' ?> mb-3">
+                                        <div class="card-header">
+                                            <h4 class="card-title">Equipo <?= ucfirst($nombre) ?></h4>
+                                            <small><?= $equipo['horario'] ?></small>
+                                        </div>
+                                        <div class="card-body">
+                                            <h2 class="display-4 text-center"><?= number_format($equipo['puntos']) ?></h2>
+                                            <button class="btn btn-sm btn-light w-100 mt-2" data-bs-toggle="collapse"
+                                                data-bs-target="#detalle-<?= $nombre ?>">
+                                                Ver Detalles
+                                            </button>
+                                        </div>
+                                        <div class="card-footer">
+                                            <?php if ($equipo['puntos'] >= 20000): ?>
+                                                <span class="badge bg-success">Premio: S/50 + Cena</span>
+                                            <?php elseif ($equipo['puntos'] >= 15000): ?>
+                                                <span class="badge bg-primary">Premio: S/30 + Merienda</span>
+                                            <?php elseif ($equipo['puntos'] >= 10000): ?>
+                                                <span class="badge bg-info">Premio: S/20</span>
+                                            <?php elseif ($equipo['puntos'] >= 5000): ?>
+                                                <span class="badge bg-light text-dark">Premio: Snacks</span>
+                                            <?php else: ?>
+                                                <span class="badge bg-secondary">En progreso</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Detalle colapsable -->
+                                <div class="collapse" id="detalle-<?= $nombre ?>">
+                                    <div class="card mb-3">
+                                        <div class="card-header">
+                                            <h5>Detalle del Equipo <?= ucfirst($nombre) ?></h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <table class="table table-sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Vendedor</th>
+                                                        <th>Horario</th>
+                                                        <th>Ventas Normales</th>
+                                                        <th>Puntos Ventas</th>
+                                                        <th>Subtotal</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <?php foreach ($equipo['detalle'] as $vendedor => $datos): ?>
+                                                        <tr>
+                                                            <td><?= $vendedor ?></td>
+                                                            <td><?= $datos['horario'] ?></td>
+                                                            <td><?= $datos['ventas'] ?? 0 ?></td>
+                                                            <td><?= number_format($datos['puntos'] ?? 0) ?></td>
+                                                            <td><?= number_format(($datos['puntos'] ?? 0) + ($datos['puntos_comisiones'] ?? 0)) ?>
+                                                            </td>
+                                                        </tr>
+                                                    <?php endforeach; ?>
+                                                    <tr class="table-active">
+                                                        <td colspan="6" class="text-end"><strong>Total + 15% Bonus:</strong></td>
+                                                        <td><strong><?= number_format($equipo['puntos']) ?></strong></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else: ?>
+                        <div class="alert alert-warning">
+                            No hay datos de ventas para mostrar en los horarios de equipos.
+                        </div>
+                    <?php endif; ?>
+                    <div class="mt-4">
+                        <canvas id="chartEquipos"></canvas>
+                    </div>
+                </div>
+
+
+            </div>
+
+            <script>
+                // Gráfico de equipos optimizado
+                const ctxEquipos = document.getElementById('chartEquipos').getContext('2d');
+                const equiposData = <?= json_encode($puntos_equipos) ?>;
+
+                // Preparar datos para el gráfico
+                const labels = Object.keys(equiposData).map(nombre => `Equipo ${nombre.charAt(0).toUpperCase() + nombre.slice(1)}`);
+                const puntosData = Object.values(equiposData).map(equipo => equipo.puntos);
+
+                new Chart(ctxEquipos, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Puntos por Equipo',
+                            data: puntosData,
+                            backgroundColor: [
+                                'rgba(255, 193, 7, 0.7)', // mañana - amarillo
+                                'rgba(23, 162, 184, 0.7)', // tarde - azul
+                                'rgba(108, 117, 125, 0.7)'  // noche - gris
+                            ],
+                            borderColor: [
+                                'rgba(255, 193, 7, 1)',
+                                'rgba(23, 162, 184, 1)',
+                                'rgba(108, 117, 125, 1)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Puntos (180 por venta válida)'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Equipos'
+                                }
+                            }
+                        },
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    label: function (context) {
+                                        const equipo = equiposData[context.label.replace('Equipo ', '').toLowerCase()];
+                                        return [
+                                            `Puntos: ${context.raw.toLocaleString()}`,
+                                            `Miembros: ${equipo.miembros.join(', ')}`,
+                                            `Horario: ${equipo.horario}`
+                                        ];
+                                    }
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Puntos por Equipo (Ventas válidas ≥150 MXN o ≥29.9 PEN)',
+                                font: {
+                                    size: 16
+                                }
+                            }
+                        }
+                    }
+                });
+            </script>
+        <?php endif; ?>
+
+
+        <?php if ($role === 'admin'): ?>
+            <div class="card mt-4">
+                <div class="card-header bg-success text-white">
+                    <h3>Recompensas Grupales</h3>
+                    <small>Basado en el rendimiento colectivo del equipo</small>
+                </div>
+                <div class="card-body">
+                    <?php foreach ($puntos_equipos as $nombre => $equipo): ?>
+                        <div class="mb-4">
+                            <h4>Equipo <?= ucfirst($nombre) ?></h4>
+
+                            <?php if (!empty($equipo['recompensas_ganadas'])): ?>
+                                <div class="alert alert-success">
+                                    <h5>Recompensas Ganadas:</h5>
+                                    <ul>
+                                        <?php foreach ($equipo['recompensas_ganadas'] as $recompensa): ?>
+                                            <li>
+                                                <?= $recompensa['icono'] ?>                 <?= $recompensa['nombre'] ?>
+                                                <small>(<?= number_format($recompensa['puntos_requeridos']) ?> pts)</small>
+                                            </li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                </div>
+                            <?php endif; ?>
+
+                            <?php if ($equipo['proxima_recompensa']): ?>
+                                <div class="alert alert-info">
+                                    <h5>Próxima Recompensa:</h5>
+                                    <p>
+                                        <strong><?= $equipo['proxima_recompensa']['icono'] ?>
+                                            <?= $equipo['proxima_recompensa']['nombre'] ?></strong><br>
+                                        Faltan <?= number_format($equipo['puntos_para_proxima']) ?> puntos
+                                    </p>
+                                </div>
+                            <?php else: ?>
+                                <div class="alert alert-warning">
+                                    ¡El equipo ha ganado todas las recompensas disponibles!
+                                </div>
+                            <?php endif; ?>
+
+                            <div class="progress">
+                                <div class="progress-bar progress-bar-striped" role="progressbar"
+                                    style="width: <?= min(100, ($equipo['puntos'] / 30000) * 100) ?>%"
+                                    aria-valuenow="<?= $equipo['puntos'] ?>" aria-valuemin="0" aria-valuemax="30000">
+                                    <?= number_format($equipo['puntos']) ?> / 30,000 pts
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+
+                    <div class="mt-3 p-3 bg-light rounded">
+                        <h5>Recompensas Disponibles:</h5>
+                        <ul>
+                            <?php foreach ($recompensas_grupales as $recompensa): ?>
+                                <li>
+                                    <strong><?= $recompensa['icono'] ?>         <?= $recompensa['nombre'] ?></strong> -
+                                    <?= number_format($recompensa['puntos_requeridos']) ?> puntos
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                        <small class="text-muted">* Basado en un promedio de 3,000 puntos diarios por equipo</small>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
+
+
+        <?php if ($role !== 'admin'): ?>
+            <div class="card mt-4">
+                <div class="card-header bg-info text-white">
+                    <h3>Recompensas de tu Equipo</h3>
+                </div>
+                <div class="card-body">
+                    <?php
+                    // Encontrar el equipo del usuario actual
+                    $equipo_usuario = null;
+                    foreach ($puntos_equipos as $nombre => $equipo) {
+                        if (in_array($username, $equipo['miembros'])) {
+                            $equipo_usuario = $equipo;
+                            break;
+                        }
+                    }
+                    ?>
+
+                    <?php if ($equipo_usuario): ?>
+                        <h4>Equipo <?= ucfirst($nombre) ?></h4>
+                        <p>Puntos totales: <strong><?= number_format($equipo_usuario['puntos']) ?></strong></p>
+
+                        <?php if (!empty($equipo_usuario['recompensas_ganadas'])): ?>
+                            <div class="alert alert-success">
+                                <h5>Recompensas Ganadas:</h5>
+                                <ul class="list-group">
+                                    <?php foreach ($equipo_usuario['recompensas_ganadas'] as $recompensa): ?>
+                                        <li class="list-group-item list-group-item-success">
+                                            <?= $recompensa['icono'] ?>                 <?= $recompensa['nombre'] ?>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            </div>
+                        <?php endif; ?>
+
+                        <?php if ($equipo_usuario['proxima_recompensa']): ?>
+                            <div class="alert alert-warning">
+                                <h5>Próxima Recompensa:</h5>
+                                <p>
+                                    <?= $equipo_usuario['proxima_recompensa']['icono'] ?>
+                                    <strong><?= $equipo_usuario['proxima_recompensa']['nombre'] ?></strong><br>
+                                    Faltan <?= number_format($equipo_usuario['puntos_para_proxima']) ?> puntos
+                                </p>
+                            </div>
+                        <?php else: ?>
+                            <div class="alert alert-primary">
+                                ¡Tu equipo ha ganado todas las recompensas disponibles!
+                            </div>
+                        <?php endif; ?>
+
+                        <div class="progress mt-3">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar"
+                                style="width: <?= min(100, ($equipo_usuario['puntos'] / 30000) * 100) ?>%">
+                                <?= number_format($equipo_usuario['puntos']) ?> / 30,000 pts
+                            </div>
+                        </div>
+                    <?php else: ?>
+                        <div class="alert alert-warning">
+                            No estás asignado a ningún equipo actualmente.
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
         <?php endif; ?>
 
         <!-- Botón para mostrar/ocultar gráficos -->
@@ -259,58 +748,6 @@ include('header.php');
                 Mostrar Gráficos
             </button>
         </div>
-        <?php if (!empty($puntos_ventas)): ?>
-            <section class="card p-3 mt-4">
-                <h2 class="text-center">Puntaje por Ventas No Promocionales</h2>
-                <div class="table-responsive">
-                    <table class="table table-bordered table-striped">
-                        <thead class="table-dark">
-                            <tr>
-                                <th>Vendedor</th>
-                                <th colspan="2" class="text-center">Ventas en MXN (≥149)</th>
-                                <th colspan="2" class="text-center">Ventas en PEN (≥29.80)</th>
-                                <th>Puntos Base</th>
-                                <th>Constante</th>
-                                <th>Puntos Finales</th>
-                            </tr>
-                            <tr>
-                                <th></th>
-                                <th>Cantidad</th>
-                                <th>Monto Total</th>
-                                <th>Cantidad</th>
-                                <th>Monto Total</th>
-                                <th></th>
-                                <th></th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($puntos_ventas as $pv): ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($pv['nombre']) ?></td>
-                                    <td><?= $pv['ventas_mxn'] ?></td>
-                                    <td>$<?= $pv['monto_mxn'] ?> MXN</td>
-                                    <td><?= $pv['ventas_pen'] ?></td>
-                                    <td>S/<?= $pv['monto_pen'] ?></td>
-                                    <td><?= $pv['puntos_base'] ?></td>
-                                    <td><?= $pv['constante'] ?></td>
-                                    <td><strong class="text-primary"><?= $pv['puntos_normalizados'] ?></strong></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="alert alert-info mt-3">
-                    <strong>Fórmula:</strong>
-                    <ul>
-                        <li>Puntos MXN = Monto Total MXN / 100</li>
-                        <li>Puntos PEN = (Monto Total PEN × 5) / 100</li>
-                        <li>Puntos Base = Puntos MXN + Puntos PEN</li>
-                        <li>Puntos Finales = Puntos Base × Constante Individual</li>
-                    </ul>
-                </div>
-            </section>
-        <?php endif; ?>
 
         <!-- Contenedor colapsable para los gráficos -->
         <div class="collapse" id="graphsContainer">
@@ -347,5 +784,77 @@ include('header.php');
             .then(response => console.log('Sesión actualizada'));
     }, 300000); // 5 minutos
 </script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const ctx = document.getElementById('chartMiProgreso').getContext('2d');
+    const puntosUsuario = <?= $puntos_usuario ?>;
+    const siguienteRecompensa = <?= $siguiente_recompensa ?? 0 ?>;
+    const porcentaje = siguienteRecompensa > 0 ? Math.min(100, (puntosUsuario / siguienteRecompensa) * 100) : 100;
+
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Tus puntos', 'Faltan para siguiente'],
+            datasets: [{
+                data: [puntosUsuario, Math.max(0, siguienteRecompensa - puntosUsuario)],
+                backgroundColor: [
+                    '#4bc0c0',
+                    '#e8e8e8'
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            cutout: '70%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        boxWidth: 12,
+                        padding: 20
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            return `${context.label}: ${context.raw.toLocaleString()} pts`;
+                        }
+                    }
+                },
+                title: {
+                    display: true,
+                    text: `Total: ${puntosUsuario.toLocaleString()} pts`,
+                    font: {
+                        size: 18,
+                        weight: 'bold'
+                    },
+                    padding: {
+                        top: 10,
+                        bottom: 20
+                    }
+                },
+                subtitle: {
+                    display: true,
+                    text: siguienteRecompensa > 0 ?
+                        `${Math.round(porcentaje)}% de ${siguienteRecompensa.toLocaleString()} pts` :
+                        '¡Has alcanzado todas las recompensas!',
+                    color: '#666',
+                    font: {
+                        size: 14
+                    },
+                    padding: {
+                        bottom: 20
+                    }
+                }
+            },
+            animation: {
+                animateScale: true,
+                animateRotate: true
+            }
+        }
+    });
+</script>
+
 
 <?php include('footer.php'); ?>

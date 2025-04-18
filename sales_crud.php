@@ -1,4 +1,6 @@
 <?php
+
+
 ob_start();
 
 if (isset($_COOKIE['user_session'])) {
@@ -127,10 +129,16 @@ include('header.php')
                 // Lista numerada de instrucciones
                 const message = `
                 <ol>
-                    <li>Registra ventas ingresando producto (por defecto ProductoA, precio en pesos mexicanos y cantidad (por defecto 1).</li>
-                    <li>Si eres vendedor solo tienes acceso de editar tus registros.</li>
-                    <li>Puedes editar tus productos, el boton verde cambiara a "Actualizar", cuidado con eso.</li>
-                    <li>Utiliza la barra de búsqueda para encontrar ventas específicas rápidamente.</li> 
+                    <li>Registra ventas ingresando producto, precio y cantidad (por defecto 1).</li>
+                    <li>Escoge si la venta se dio en messenger o wn whatsapp con el switch, por defecto estará en messenger.</li>
+                    <li>Tambien puedes escoger si la venta tiene alguna observación.</li>
+                    <li>Para guardar en soles debes dar en el boton correspondiente (Guardar PEN).</li>
+                    <li>Para guardar en pesos mexicanos deber dar dar en el boton correspondiente (Guardar MXN).</li>
+                    <li>Si la venta fue hecha en otra moneda haz click en "Mas opciones de moneda" y seleciona la moneda correspondiente</li>
+                    <li>Para editar una venta solo dale al boton "editar", ten cuidado y revisa la información antes de guardar</li>
+                    <li>Solo puededes ver/editar las ventas del día.</li>
+                    <li>Utiliza la barra de búsqueda para encontrar ventas específicas rápidamente.</li>
+                    
                 </ol>
             `;
                 appendAlert(message, 'success');

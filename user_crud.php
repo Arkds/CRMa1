@@ -24,16 +24,23 @@ if ($role !== 'admin') {
 }
 
 
+// En la parte superior del archivo, después de la verificación de admin
+$turnos_disponibles = [
+    'mañana_completo' => 'Mañana Completo (8am-5pm)',
+    'mañana_parcial' => 'Mañana Parcial (8am-2pm)',
+    'tarde' => 'Tarde (2pm-8pm)',
+    'noche' => 'Noche (5pm-11pm)',
+    'mixto' => 'Mixto (Horarios variables)'
+];
 // Acción actual
 $action = $_GET['action'] ?? '';
 $id = $_GET['id'] ?? null;
-if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['user_id'], $_POST['shift'], $_POST['checked'])) {
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['user_id'], $_POST['shift'], $_POST['action_shift'])) {
     $user_id = $_POST['user_id'];
     $shift = $_POST['shift'];
-    $checked = $_POST['checked'];
 
-    if ($checked == 1) {
-        // Agregar turno si no existe
+    if ($_POST['action_shift'] === 'add') {
+        // Verificar si el turno ya existe
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM user_shifts WHERE user_id = ? AND shift = ?");
         $stmt->execute([$user_id, $shift]);
         $exists = $stmt->fetchColumn();
@@ -42,16 +49,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['user_id'], $_POST['sh
             $stmt = $pdo->prepare("INSERT INTO user_shifts (user_id, shift) VALUES (?, ?)");
             $stmt->execute([$user_id, $shift]);
         }
-    } else {
-        // Eliminar turno si el checkbox se desmarca
+    } elseif ($_POST['action_shift'] === 'remove') {
         $stmt = $pdo->prepare("DELETE FROM user_shifts WHERE user_id = ? AND shift = ?");
         $stmt->execute([$user_id, $shift]);
     }
 
-    echo "Horario actualizado";
+    echo json_encode(['status' => 'success']);
     exit;
 }
-
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = $_POST['username'];
@@ -85,6 +90,23 @@ if ($action === 'delete' && $id) {
 
 // Obtener lista de usuarios
 $users = $pdo->query("SELECT id, username, role, created_at FROM users")->fetchAll();
+
+
+foreach ($users as $user) {
+    if (isset($asignaciones_automaticas[$user['username']])) {
+        foreach ($asignaciones_automaticas[$user['username']] as $shift) {
+            // Verificar si ya está asignado
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM user_shifts WHERE user_id = ? AND shift = ?");
+            $stmt->execute([$user['id'], $shift]);
+            $exists = $stmt->fetchColumn();
+            
+            if (!$exists) {
+                $stmt = $pdo->prepare("INSERT INTO user_shifts (user_id, shift) VALUES (?, ?)");
+                $stmt->execute([$user['id'], $shift]);
+            }
+        }
+    }
+}
 include('header.php')
 
     ?>
@@ -102,10 +124,8 @@ include('header.php')
                 <th>Usuario</th>
                 <th>Rol</th>
                 <th>Fecha de Creación</th>
-                <th>Turno Mañana</th>
-                <th>Turno Tarde</th>
-                <th>Turno Noche 1</th>
-                <th>Turno Noche 2</th>
+                <th>Turnos Asignados</th>
+                <th>Asignar Turnos</th>
                 <th>Acciones</th>
             </tr>
         </thead>
@@ -123,20 +143,27 @@ include('header.php')
                     <td><?= $user['role'] ?></td>
                     <td><?= $user['created_at'] ?></td>
                     <td>
-                        <input type="checkbox" class="shift-checkbox" data-user="<?= $user['id'] ?>" value="mañana"
-                            <?= in_array('mañana', $user_shifts) ? 'checked' : '' ?>>
+                        <?php if (!empty($user_shifts)): ?>
+                            <ul>
+                                <?php foreach ($user_shifts as $shift): ?>
+                                    <li><?= $turnos_disponibles[$shift] ?? $shift ?></li>
+                                <?php endforeach; ?>
+                            </ul>
+                        <?php else: ?>
+                            <span class="text-muted">Sin turnos asignados</span>
+                        <?php endif; ?>
                     </td>
                     <td>
-                        <input type="checkbox" class="shift-checkbox" data-user="<?= $user['id'] ?>" value="tarde"
-                            <?= in_array('tarde', $user_shifts) ? 'checked' : '' ?>>
-                    </td>
-                    <td>
-                        <input type="checkbox" class="shift-checkbox" data-user="<?= $user['id'] ?>" value="noche_1"
-                            <?= in_array('noche_1', $user_shifts) ? 'checked' : '' ?>>
-                    </td>
-                    <td>
-                        <input type="checkbox" class="shift-checkbox" data-user="<?= $user['id'] ?>" value="noche_2"
-                            <?= in_array('noche_2', $user_shifts) ? 'checked' : '' ?>>
+                        <select class="form-select shift-select" data-user="<?= $user['id'] ?>">
+                            <option value="">Seleccionar turno...</option>
+                            <?php foreach ($turnos_disponibles as $value => $label): ?>
+                                <option value="<?= $value ?>"><?= $label ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <button class="btn btn-sm btn-primary mt-2 assign-shift"
+                            data-user="<?= $user['id'] ?>">Asignar</button>
+                        <button class="btn btn-sm btn-danger mt-2 remove-shift"
+                            data-user="<?= $user['id'] ?>">Quitar</button>
                     </td>
                     <td>
                         <a href="user_crud.php?action=edit&id=<?= $user['id'] ?>" class="btn btn-warning btn-sm">Editar</a>
@@ -184,36 +211,80 @@ include('header.php')
 <!-- Inicializar DataTables -->
 <script>
     document.addEventListener("DOMContentLoaded", function () {
-        document.querySelectorAll(".shift-checkbox").forEach(checkbox => {
-            checkbox.addEventListener("change", function () {
-                let userId = this.getAttribute("data-user");
-                let shift = this.value;
-                let checked = this.checked ? 1 : 0;
+        // Manejar asignación de turnos
+        document.querySelectorAll('.assign-shift').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const userId = this.getAttribute('data-user');
+                const select = this.closest('td').querySelector('.shift-select');
+                const shift = select.value;
+
+                if (!shift) {
+                    alert('Por favor selecciona un turno');
+                    return;
+                }
 
                 fetch("user_crud.php", {
                     method: "POST",
                     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                    body: `user_id=${userId}&shift=${shift}&checked=${checked}`
-                }).then(response => response.text())
-                    .then(data => console.log(data))
+                    body: `user_id=${userId}&shift=${shift}&action_shift=add`
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            location.reload(); // Recargar para ver los cambios
+                        }
+                    })
                     .catch(error => console.error("Error:", error));
             });
         });
-    });
-</script>
 
-<script>
-    $(document).ready(function () {
+        // Manejar eliminación de turnos
+        document.querySelectorAll('.remove-shift').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const userId = this.getAttribute('data-user');
+                const select = this.closest('td').querySelector('.shift-select');
+                const shift = select.value;
+
+                if (!shift) {
+                    alert('Por favor selecciona un turno');
+                    return;
+                }
+
+                if (!confirm(`¿Estás seguro de quitar el turno ${select.options[select.selectedIndex].text}?`)) {
+                    return;
+                }
+
+                fetch("user_crud.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: `user_id=${userId}&shift=${shift}&action_shift=remove`
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            location.reload(); // Recargar para ver los cambios
+                        }
+                    })
+                    .catch(error => console.error("Error:", error));
+            });
+        });
+
+        // Inicializar DataTables
         $('#usersTable').DataTable({
             paging: true,
             searching: true,
             ordering: true,
             language: {
                 url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
-            }
+            },
+            columnDefs: [
+                { orderable: false, targets: [4, 5, 6] } // Hacer que las columnas de acciones no sean ordenables
+            ]
         });
     });
 </script>
+
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
     integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
     crossorigin="anonymous"></script>

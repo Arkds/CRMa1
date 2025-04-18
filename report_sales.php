@@ -27,7 +27,13 @@ $endDate = $_GET['end_date'] ?? null;
 $selectedUser = $_GET['user_id'] ?? null;
 
 // Construir la consulta SQL seg��n los filtros
-$query = "SELECT s.*, u.username FROM sales s JOIN users u ON s.user_id = u.id WHERE 1=1";
+$query = "SELECT 
+    s.id, s.product_name, s.price, s.quantity, s.currency,
+    s.created_at, s.sale_type, s.client_phone, s.observations,
+    u.username
+    FROM sales s 
+    JOIN users u ON s.user_id = u.id 
+    WHERE 1=1";
 $params = [];
 if (!empty($_GET['currency'])) {
     $placeholders = implode(',', array_fill(0, count($_GET['currency']), '?'));
@@ -36,13 +42,14 @@ if (!empty($_GET['currency'])) {
 }
 // Filtrar por fecha exacta
 if ($date) {
-    $query .= " AND DATE(s.created_at) = ?";
+    $query .= " AND s.created_at >= ? AND s.created_at < ? + INTERVAL 1 DAY";
+    $params[] = $date;
     $params[] = $date;
 }
 
 // Filtrar por rango de fechas
 if ($startDate && $endDate) {
-    $query .= " AND DATE(s.created_at) BETWEEN ? AND ?";
+    $query .= " AND s.created_at >= ? AND s.created_at < ? + INTERVAL 1 DAY";
     $params[] = $startDate;
     $params[] = $endDate;
 }
@@ -150,9 +157,9 @@ include('header.php')
             </div>
             <!-- Filtro de monedas mejor integrado -->
             <div class="col-md-3 mt-2">
-                <div class="border p-2 rounded"> 
-                    <label class="form-label d-block mb-1">Moneda</label> 
-                    <div class="form-check form-check-inline"> 
+                <div class="border p-2 rounded">
+                    <label class="form-label d-block mb-1">Moneda</label>
+                    <div class="form-check form-check-inline">
                         <input class="form-check-input" type="checkbox" name="currency[]" value="MXN" id="currencyMXN"
                             <?= (empty($_GET['currency']) || in_array('MXN', $_GET['currency'] ?? [])) ? 'checked' : '' ?>>
                         <label class="form-check-label small" for="currencyMXN">MXN</label>
@@ -198,7 +205,7 @@ include('header.php')
                 <?php foreach ($totalsByCurrency as $currency => $totals): ?>
                     <div class="col-md-3 mb-1">
                         <div class="card">
-                            <div class="card-body small"> 
+                            <div class="card-body small">
                                 <h6 class="card-title mb-1 text-uppercase"><?= $currency ?></h6>
                                 <p class="card-text mb-0">
                                     <strong>Productos:</strong> <?= $totals['quantity'] ?><br>
