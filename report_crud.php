@@ -629,6 +629,17 @@ include('header.php')
         });
 
     </script>
+    <script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const form = document.querySelector('#reportModal form');
+        const submitButton = form.querySelector('button[type="submit"]');
+
+        form.addEventListener('submit', function () {
+            submitButton.disabled = true;
+            submitButton.innerText = 'Guardando...';
+        });
+    });
+</script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

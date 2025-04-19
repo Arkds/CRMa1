@@ -179,7 +179,7 @@
                         <i class="bi bi-question-circle"></i>
                     </button>
                     <button class="nav-link btn btn-link text-white nav-icons"
-                        onclick="window.location.href='graphs.php';">
+                        onclick="window.location.href='super_recompensas.php';">
                         <i class="bi bi-bar-chart-line""></i>
                     </button>
                     <button class="nav-link btn btn-link text-white nav-icons"

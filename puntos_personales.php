@@ -1,6 +1,25 @@
 <?php
 // puntos_personales.php
 
+// Función para obtener el último lunes a las 00:00:00
+function getLastMonday() {
+    $today = new DateTime();
+    $today->setTime(0, 0, 0);
+    $dayOfWeek = (int)$today->format('N'); // 1 (lunes) - 7 (domingo)
+    
+    // Si hoy no es lunes, retroceder al lunes anterior
+    if ($dayOfWeek > 1) {
+        $today->modify('-'.($dayOfWeek - 1).' days');
+    }
+    
+    return $today->format('Y-m-d H:i:s');
+}
+
+// Obtener el último lunes y la fecha/hora actual
+$inicio_semana = getLastMonday();
+$fin_semana = date('Y-m-d H:i:s');
+
+// Consulta para comisiones (solo desde el lunes)
 $stmt_comisiones = $pdo->prepare("
     SELECT u.username, COUNT(c.id) AS total_ventas
     FROM commissions c
@@ -9,11 +28,12 @@ $stmt_comisiones = $pdo->prepare("
     GROUP BY u.username
 ");
 $stmt_comisiones->execute([
-    'inicio' => date('Y-m-d H:i:s', strtotime('-7 days')),
-    'fin' => date('Y-m-d H:i:s')
+    'inicio' => $inicio_semana,
+    'fin' => $fin_semana
 ]);
 $ventas_comision = $stmt_comisiones->fetchAll();
 
+// Resto del código sigue igual...
 foreach ($ventas_comision as $vc) {
     $puntos_base = $vc['total_ventas'] * 100;
     $constante = $user_constants[$vc['username']] ?? 1;
@@ -27,6 +47,7 @@ foreach ($ventas_comision as $vc) {
     ];
 }
 
+// Consulta para ventas normales (solo desde el lunes)
 $stmt_ventas_normales = $pdo->prepare("
     SELECT 
         u.username,
@@ -38,11 +59,12 @@ $stmt_ventas_normales = $pdo->prepare("
     GROUP BY u.username
 ");
 $stmt_ventas_normales->execute([
-    'inicio' => date('Y-m-d H:i:s', strtotime('-7 days')),
-    'fin' => date('Y-m-d H:i:s')
+    'inicio' => $inicio_semana,
+    'fin' => $fin_semana
 ]);
 $ventas_normales = $stmt_ventas_normales->fetchAll();
 
+// Resto del código sigue igual...
 foreach ($ventas_normales as $vn) {
     $total_ventas = $vn['ventas_mxn'] + $vn['ventas_pen'];
     $puntos_base = $total_ventas * 180;
@@ -60,7 +82,8 @@ foreach ($ventas_normales as $vn) {
     ];
 }
 
-// Sumar puntos totales
+// Sumar puntos totales (solo para esta semana)
+$puntos_totales = [];
 foreach ($puntos_comisiones as $pc) {
     $vendedor = $pc['vendedor'];
     if (!isset($puntos_totales[$vendedor])) {
@@ -78,5 +101,3 @@ foreach ($puntos_ventas_normales as $pvn) {
 }
 
 arsort($puntos_totales);
-
-
