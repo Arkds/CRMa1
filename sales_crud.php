@@ -24,7 +24,44 @@ if (isset($_COOKIE['user_session'])) {
 }
 require 'db.php';
 
+// Función para asignar puntos por venta
+function asignarPuntosVenta($pdo, $venta_id, $user_id, $price, $currency)
+{
+    // Verificar si cumple los criterios para puntos
+    $es_valida = ($currency == 'MXN' && $price > 150) || ($currency == 'PEN' && $price > 29.90);
 
+    if ($es_valida) {
+        $pdo->beginTransaction();
+
+        try {
+            // 1. Asignar 180 puntos al usuario
+            $stmt = $pdo->prepare("UPDATE users SET puntos_historicos = puntos_historicos + 180 WHERE id = ?");
+            $stmt->execute([$user_id]);
+
+            // 2. Registrar en el historial de puntos
+            $stmt = $pdo->prepare("INSERT INTO historial_puntos_historicos 
+                                 (user_id, puntos, tipo, comentario) 
+                                 VALUES (?, 180, 'venta_normal', ?)");
+            $comentario = "Venta #$venta_id - " . ($currency == 'MXN' ? "$" . number_format($price, 2) . " MXN" : "S/" . number_format($price, 2));
+            $stmt->execute([$user_id, $comentario]);
+
+            // 3. Marcar venta como procesada y guardar puntos asignados
+            $stmt = $pdo->prepare("UPDATE sales SET puntos_asignados = TRUE, puntos_venta = 180 WHERE id = ?");
+            $stmt->execute([$venta_id]);
+
+            $pdo->commit();
+            return true;
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            error_log("Error asignando puntos por venta ID $venta_id: " . $e->getMessage());
+            return false;
+        }
+    } else {
+        // Marcar venta como procesada (aunque no cumpla criterios)
+        $pdo->prepare("UPDATE sales SET puntos_asignados = TRUE WHERE id = ?")->execute([$venta_id]);
+        return false;
+    }
+}
 
 $isAdmin = isset($role) && $role === 'admin';
 
@@ -62,7 +99,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $pdo->prepare("INSERT INTO sales (product_name, price, quantity, user_id, currency, sale_type, client_phone, observations) 
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([$productName, $price, $quantity, $user_id, $currency, $saleType, $clientPhone, $observations]);
+        $venta_id = $pdo->lastInsertId();
+
+        // Asignar puntos automáticamente
+        asignarPuntosVenta($pdo, $venta_id, $user_id, $price, $currency);
     } elseif ($action === 'edit' && $id) {
+        // Obtener datos actuales de la venta
+        $stmt = $pdo->prepare("SELECT price, currency, puntos_asignados FROM sales WHERE id = ?");
+        $stmt->execute([$id]);
+        $venta_actual = $stmt->fetch();
+
         $stmt = $pdo->prepare("UPDATE sales SET 
                             product_name = ?, 
                             price = ?, 
@@ -73,8 +119,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             observations = ?
                             WHERE id = ?");
         $stmt->execute([$productName, $price, $quantity, $currency, $saleType, $clientPhone, $observations, $id]);
-    }
 
+        // Si cambió el precio o la moneda, y aún no se han asignado puntos
+        if (
+            !$venta_actual['puntos_asignados'] &&
+            ($venta_actual['price'] != $price || $venta_actual['currency'] != $currency)
+        ) {
+            asignarPuntosVenta($pdo, $id, $user_id, $price, $currency);
+        }
+    }
     setcookie('success_message', "¡Venta " . ($action === 'edit' ? 'actualizada' : 'registrada') . " en $currency!", time() + 5, "/");
     header('Location: sales_crud.php');
     exit;
@@ -337,6 +390,7 @@ include('header.php')
 
     <!-- Tabla de ventas -->
     <h2>Ventas Registradas</h2>
+    <!-- En la sección de la tabla de ventas -->
     <table id="salesTable" class="table table-striped display compact table-bordered ">
         <thead>
             <tr>
@@ -347,6 +401,7 @@ include('header.php')
                 <th>Moneda</th>
                 <th>Cantidad</th>
                 <th>Total</th>
+                <th>Puntos</th> <!-- Nueva columna -->
                 <th>Vendedor</th>
                 <th>Fecha</th>
                 <th>Acciones</th>
@@ -362,16 +417,20 @@ include('header.php')
                     <td><?= strtoupper($sale['currency']) ?></td>
                     <td><?= htmlspecialchars($sale['quantity']) ?></td>
                     <td><?= number_format($sale['price'] * $sale['quantity'], 2) ?></td>
+                    <td>
+                        <?php if ($sale['puntos_venta'] > 0): ?>
+                            <span class="badge bg-success">+<?= $sale['puntos_venta'] ?></span>
+                        <?php else: ?>
+                            <span class="badge bg-secondary">-</span>
+                        <?php endif; ?>
+                    </td>
                     <td><?= $isAdmin ? htmlspecialchars($sale['username']) : htmlspecialchars($username) ?></td>
                     <td><?= htmlspecialchars($sale['created_at']) ?></td>
                     <td>
                         <a href="sales_crud.php?action=edit&id=<?= $sale['id'] ?>" class="btn btn-warning btn-sm">Editar</a>
                     </td>
                 </tr>
-            <?php endforeach;
-            ob_end_flush(); 
-            ?>
-
+            <?php endforeach; ?>
         </tbody>
     </table>
 
