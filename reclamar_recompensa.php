@@ -1,5 +1,5 @@
 <?php
-require 'db.php';
+require_once 'db.php';
 session_start();
 
 header('Content-Type: application/json');
@@ -32,10 +32,10 @@ if ($stmt->fetch()) {
 
 // Verificar que los puntos coincidan con una recompensa válida
 $recompensas_validas = [
-    3000 => 'Recarga de S/5 o snack sorpresa',
-    5000 => 'Recarga de S/10 o canjeo de menú',
-    7500 => 'Suscripción de un mes (app)',
-    12000 => 'Vale digital de S/20'
+    5000 => 'Recarga de S/5 o snack sorpresa',
+    10000 => 'Recarga de S/10 o canjeo de menú',
+    1500 => 'Suscripción de un mes (app)',
+    20000 => 'Vale digital de S/20'
 ];
 
 if (!array_key_exists($puntos, $recompensas_validas)) {

@@ -1,5 +1,27 @@
 <?php
 require 'datos_index.php';
+if ($role === 'vendedor') {
+    $fechaHoy = (new DateTime('now', new DateTimeZone('America/Lima')))->format('Y-m-d');
+
+    // Recordatorios de hoy
+    $stmtHoy = $pdo->prepare("
+        SELECT COUNT(*) FROM report_clients rc
+        JOIN reports r ON rc.report_id = r.id
+        WHERE rc.fecha_recuerdo = :hoy AND r.user_id = :user_id
+    ");
+    $stmtHoy->execute([':hoy' => $fechaHoy, ':user_id' => $user_id]);
+    $recordatoriosHoy = $stmtHoy->fetchColumn();
+
+    // Recordatorios pasados
+    $stmtPasado = $pdo->prepare("
+        SELECT COUNT(*) FROM report_clients rc
+        JOIN reports r ON rc.report_id = r.id
+        WHERE rc.fecha_recuerdo < :hoy AND r.user_id = :user_id
+    ");
+    $stmtPasado->execute([':hoy' => $fechaHoy, ':user_id' => $user_id]);
+    $recordatoriosPasados = $stmtPasado->fetchColumn();
+}
+
 
 $user_constants = [
     'Sheyla' => 0.83,
@@ -15,6 +37,24 @@ include('header.php');
 
 <div class="container mt-5">
     <div id="liveAlertPlaceholder"></div>
+<?php if ($role === 'vendedor'): ?>
+    <div class="d-flex flex-column gap-2 my-3">
+        <?php if (!empty($recordatoriosHoy)): ?>
+            <div class="alert alert-info py-2 px-3 d-flex justify-content-between align-items-center shadow-sm" style="font-size: 0.9rem;">
+                <span>📅 Tienes <strong><?= $recordatoriosHoy ?></strong> recordatorio(s) para <strong>hoy</strong>.</span>
+                <a href="tracin_crud.php?filtro=recordatorios_hoy" class="btn btn-sm btn-outline-dark">Ver</a>
+            </div>
+        <?php endif; ?>
+
+        <?php if (!empty($recordatoriosPasados)): ?>
+            <div class="alert alert-warning py-2 px-3 d-flex justify-content-between align-items-center shadow-sm" style="font-size: 0.9rem;">
+                <span>⏰ Tienes <strong><?= $recordatoriosPasados ?></strong> recordatorio(s) <strong>vencidos</strong>.</span>
+                <a href="tracin_crud.php?filtro=recordatorios_pasados" class="btn btn-sm btn-outline-dark">Ver</a>
+            </div>
+        <?php endif; ?>
+    </div>
+<?php endif; ?>
+
 
     <script>
         const alertPlaceholder = document.getElementById('liveAlertPlaceholder')
@@ -113,10 +153,10 @@ include('header.php');
                 // Datos del usuario actual
                 $puntos_usuario = $datos_para_mostrar['total'] ?? 0;
                 $recompensas = [
-                    3000 => "Recarga de S/5 o snack sorpresa",
-                    5000 => "Recarga de S/10 o canjeo de menú",
-                    7500 => "Suscripción de un mes (app)",
-                    12000 => "Vale digital de S/20"
+                    5000 => "Recarga de S/5 o snack sorpresa",
+                    10000 => "Recarga de S/10 o canjeo de menú",
+                    15000 => "Suscripción de un mes (app)",
+                    20000 => "Vale digital de S/20"
                 ];
 
                 // Determinar recompensas alcanzadas y siguientes
@@ -257,14 +297,14 @@ include('header.php');
                                             </button>
                                         </div>
                                         <div class="card-footer">
-                                            <?php if ($equipo['puntos'] >= 20000): ?>
-                                                <span class="badge bg-success">Premio: S/50 + Cena</span>
+                                            <?php if ($equipo['puntos'] >= 31000): ?>
+                                                <span class="badge bg-success">Premio: Reconocimiento</span>
+                                            <?php elseif ($equipo['puntos'] >= 27000): ?>
+                                                <span class="badge bg-primary">Premio: Tarde libre</span>
+                                            <?php elseif ($equipo['puntos'] >= 21000): ?>
+                                                <span class="badge bg-info">Premio: Bono</span>
                                             <?php elseif ($equipo['puntos'] >= 15000): ?>
-                                                <span class="badge bg-primary">Premio: S/30 + Merienda</span>
-                                            <?php elseif ($equipo['puntos'] >= 10000): ?>
-                                                <span class="badge bg-info">Premio: S/20</span>
-                                            <?php elseif ($equipo['puntos'] >= 5000): ?>
-                                                <span class="badge bg-light text-dark">Premio: Snacks</span>
+                                                <span class="badge bg-light text-dark">Premio: Pizza</span>
                                             <?php else: ?>
                                                 <span class="badge bg-secondary">En progreso</span>
                                             <?php endif; ?>
@@ -556,6 +596,12 @@ include('header.php');
         });
     });
 </script>
+<?php
+if (isset($pdo)) {
+    $pdo = null;
+}
+?>
 
 
 <?php include('footer.php'); ?>
+

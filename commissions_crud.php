@@ -167,14 +167,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if ($commission_id) {
         $description = $_POST['description'] ?? null;
-
+    
         $query = $isAdmin
-            ? "UPDATE commissions SET product_name=?, price=?, channel=?, operation_number=?, description=? WHERE id=?"
-            : "UPDATE commissions SET product_name=?, price=?, channel=?, operation_number=?, description=? WHERE id=? AND user_id=?";
-
+            ? "UPDATE commissions SET product_name=?, price=?, channel=?, operation_number=?, description=?, client_email=?, voucher_datetime=? WHERE id=?"
+            : "UPDATE commissions SET product_name=?, price=?, channel=?, operation_number=?, description=?, client_email=?, voucher_datetime=? WHERE id=? AND user_id=?";
+    
         $params = $isAdmin
-            ? [$product_name, $price, $channel, $operation_number, $description, $commission_id]
-            : [$product_name, $price, $channel, $operation_number, $description, $commission_id, $user_id];
+            ? [$product_name, $price, $channel, $operation_number, $description, $client_email, $voucher_datetime, $commission_id]
+            : [$product_name, $price, $channel, $operation_number, $description, $client_email, $voucher_datetime, $commission_id, $user_id];
+
 
         $stmt = $pdo->prepare($query);
         $stmt->execute($params);

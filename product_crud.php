@@ -4,7 +4,7 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 
-require 'db.php';
+require_once 'db.php';
 
 if (isset($_COOKIE['user_session'])) {
     // Decodificar la cookie
@@ -93,7 +93,10 @@ if ($action === 'get' && $id) {
     } else {
         echo json_encode(['error' => 'Producto no encontrado']);
     }
+    unset($stmt);
+    unset($pdo);
     exit;
+
 }
 
 
@@ -360,6 +363,7 @@ include('header.php')
                 }
             };
         });
+        
 
     </script>
 
@@ -400,5 +404,9 @@ include('header.php')
 
     </script>
     </body>
+<?php
+if (isset($stmt)) unset($stmt);
+unset($pdo);
+?>
 
     </html>

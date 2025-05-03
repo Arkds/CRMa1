@@ -1,5 +1,5 @@
 <?php
-require 'db.php'; // Asegurar que este archivo configura $pdo correctamente
+require 'db.php';
 if (isset($_COOKIE['user_session'])) {
     $user_data = json_decode(base64_decode($_COOKIE['user_session']), true);
 
@@ -20,37 +20,59 @@ $statuses = ["Nuevo", "Interesado", "Negociación", "Comprometido", "Vendido", "
 $channels = ["WhatsApp", "Email", "Teléfono", "Referido", "Redes Sociales"];
 // Editar cliente
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $id = $_POST['id'];  // Obtener el ID del cliente a editar
+    $id = $_POST['id']; 
     $name = $_POST['name'];
     $phone = $_POST['phone'];
     $email = $_POST['email'];
     $description = $_POST['description'];
     $status = $_POST['status'];
     $channel = $_POST['channel'];
+    $fecha_recuerdo = !empty($_POST['fecha_recuerdo']) ? $_POST['fecha_recuerdo'] : null;
+
     if ($id) {
-        $stmt = $pdo->prepare("UPDATE report_clients SET name = ?, phone = ?, email = ?, description = ?, status = ?, channel = ? WHERE id = ?");
-        $stmt->execute([$name, $phone, $email, $description, $status, $channel, $id]);
+        $stmt = $pdo->prepare("UPDATE report_clients SET name = ?, phone = ?, email = ?, description = ?, status = ?, channel = ?, fecha_recuerdo = ? WHERE id = ?");
+        $stmt->execute([$name, $phone, $email, $description, $status, $channel, $fecha_recuerdo, $id]);
     }
+
     header('Location: tracin_crud.php');
     exit;
 }
 // Obtener clientes con la última edición
-$query = "SELECT *, 
-                 DATE_FORMAT(updated_at, '%d/%m/%Y %H:%i') AS last_edit, 
-                 DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS created_date 
-          FROM report_clients 
-          ORDER BY FIELD(status, 'Nuevo', 'Interesado', 'Negociación', 'Comprometido', 'Vendido', 'Perdido'), created_at DESC";
+$query = "
+    SELECT rc.*, 
+           DATE_FORMAT(rc.updated_at, '%d/%m/%Y %H:%i') AS last_edit, 
+           DATE_FORMAT(rc.created_at, '%Y-%m-%d %H:%i:%s') AS created_date,
+           u.username AS registrado_por
+    FROM report_clients rc
+    JOIN reports r ON rc.report_id = r.id
+    JOIN users u ON r.user_id = u.id
+    ORDER BY FIELD(rc.status, 'Nuevo', 'Interesado', 'Negociación', 'Comprometido', 'Vendido', 'Perdido'), rc.created_at DESC
+";
+
 
 
 $stmt = $pdo->query($query);
 $clients = [];
 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
     $clients[$row['status']][] = $row;
+    
 }
+
 include('header.php')
 
-?>
 
+?>
+<style>
+    .ocultar-fila {
+        display: none !important;
+    }
+</style>
+
+
+    <script>
+    const currentUser = "<?= htmlspecialchars($username); ?>";
+    const isAdmin = "<?= $role; ?>" === "admin";
+</script>
 
 
 
@@ -63,8 +85,8 @@ include('header.php')
             const appendAlert = (message, type) => {
                 const wrapper = document.createElement('div')
                 wrapper.innerHTML = [
-                    `<div class="alert alert-${type} alert-dismissible" role="alert">`,
-                    `   <div>${message}</div>`,
+                    <div class="alert alert-${type} alert-dismissible" role="alert">,
+                       <div>${message}</div>,
                     '   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>',
                     '</div>'
                 ].join('')
@@ -77,7 +99,7 @@ include('header.php')
             if (alertTrigger) {
                 alertTrigger.addEventListener('click', () => {
                     // Lista numerada de instrucciones
-                    const message = `
+                    const message = 
                 <ol>
                     <li>Aqui se pueden ver los clientes potenciales y hacerle seguimiento.</li>
                     <li>En las dos tablas los clientes mas recietnes estan en la parte superior.</li>
@@ -87,13 +109,19 @@ include('header.php')
                     <li>Todos tienen acceso a los clientes potenciales.</li>
                     <li>Utiliza la barra de búsqueda para encontrar regístros específicos rápidamente.</li> 
                 </ol>
-            `;
+            ;
                     appendAlert(message, 'success');
                 })
             }
         </script>
         <h1 class="text-center">Seguimiento de Clientes</h1>
         <!--<button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>-->
+        
+        <div class="mb-3">
+        <button class="btn btn-outline-primary" onclick="filtrarRecuerdo('futuro')">☀️ Mostrar Recordatorios Actuales/Futuros</button>
+        <button class="btn btn-outline-danger" onclick="filtrarRecuerdo('pasado')">⏰ Mostrar Recordatorios Pasados</button>
+        <button class="btn btn-outline-secondary" onclick="resetFiltro()">🔄 Ver Todos</button>
+        </div>
         <!-- Tabla 1: Clientes en proceso -->
         <h2 class="mt-5 text-primary">Clientes en Proceso</h2>
         <table class="table table-bordered table-striped" id="tracintable1">
@@ -103,11 +131,14 @@ include('header.php')
                     <th>Nombre</th>
                     <th>Teléfono</th>
                     <th>Email</th>
+                    <th>Fecha recuerdo</th>
                     <th>Descripción</th>
                     <th>Canal</th>
                     <th>Estado</th> <!-- Nueva columna -->
                     <th>Última Edición</th>
+                    
                     <th>Acciones</th>
+                    
                 </tr>
             </thead>
             <tbody>
@@ -117,13 +148,18 @@ include('header.php')
                     if (!empty($clients[$status])):
                         foreach ($clients[$status] as $client): ?>
                             <tr>
-                                <td><?= date("Y-m-d H:i:s", strtotime($client['created_date'])) ?: 'No disponible'; ?></td>
+                                <td>
+    <?= date("Y-m-d H:i:s", strtotime($client['created_date'])) ?><br>
+    <small class="text-muted">por <?= htmlspecialchars($client['registrado_por']) ?></small>
+</td>
+
 
 
 
                                 <td><?= htmlspecialchars($client['name']); ?></td>
                                 <td><?= htmlspecialchars($client['phone']); ?></td>
                                 <td><?= htmlspecialchars($client['email']); ?></td>
+                                <td><?= htmlspecialchars($client['fecha_recuerdo']); ?></td>
                                 <td>
                                     <div class="text-truncate" style="max-width: 150px; cursor:pointer;"
                                         onclick="toggleExpand(this)">
@@ -136,15 +172,19 @@ include('header.php')
                                 <td><?= $client['last_edit'] ?: 'Nunca editado'; ?></td>
                                 <td>
                                     <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#clientModal"
-                                        onclick='openModal(<?= $client['id']; ?>, 
-    <?= json_encode($client['name']); ?>, 
-    <?= json_encode($client['phone']); ?>, 
-    <?= json_encode($client['email']); ?>, 
-    <?= json_encode($client['description'] ?: ""); ?>, 
-    <?= json_encode($client['status']); ?>, 
-    <?= json_encode($client['channel'] ?: ""); ?>)'>
-                                        Editar
-                                    </button>
+    onclick="openModal(
+        <?= $client['id']; ?>, 
+        '<?= addslashes(htmlspecialchars($client['name'])); ?>', 
+        '<?= addslashes(htmlspecialchars($client['phone'])); ?>', 
+        '<?= addslashes(htmlspecialchars($client['email'])); ?>', 
+        `<?= addslashes(str_replace(["\r", "\n"], '\n', htmlspecialchars($client['description'] ?: ""))); ?>`, 
+        '<?= $client['status']; ?>', 
+        '<?= addslashes(htmlspecialchars($client['channel'] ?: "")); ?>',
+        '<?= $client['fecha_recuerdo'] ? date('Y-m-d', strtotime($client['fecha_recuerdo'])) : ''; ?>'
+    )">
+    Editar
+</button>
+
 
                                 </td>
                             </tr>
@@ -190,11 +230,18 @@ include('header.php')
                                 <td><?= $client['last_edit'] ?: 'Nunca editado'; ?></td>
                                 <td>
                                     <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#clientModal"
-                                        onclick="openModal(<?= $client['id']; ?>, '<?= htmlspecialchars($client['name']); ?>', 
-            '<?= htmlspecialchars($client['phone']); ?>', '<?= htmlspecialchars($client['email']); ?>', 
-            '<?= htmlspecialchars($client['description']); ?>', '<?= $client['status']; ?>', '<?= htmlspecialchars($client['channel']); ?>')">
-                                        Editar
-                                    </button>
+    onclick="openModal(
+        <?= $client['id']; ?>, 
+        '<?= addslashes(htmlspecialchars($client['name'])); ?>', 
+        '<?= addslashes(htmlspecialchars($client['phone'])); ?>', 
+        '<?= addslashes(htmlspecialchars($client['email'])); ?>', 
+        `<?= addslashes(str_replace(["\r", "\n"], '\n', htmlspecialchars($client['description'] ?: ""))); ?>`, 
+        '<?= $client['status']; ?>', 
+        '<?= addslashes(htmlspecialchars($client['channel'] ?: "")); ?>',
+        '<?= $client['fecha_recuerdo'] ? date('Y-m-d', strtotime($client['fecha_recuerdo'])) : ''; ?>'
+    )">
+    Editar
+</button>
                                 </td>
                             </tr>
                         <?php endforeach;
@@ -243,6 +290,15 @@ include('header.php')
                             <label for="channel" class="form-label">Canal</label>
                             <input type="text" class="form-control" id="channel" name="channel">
                         </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="recuerdoCheck">
+                            <label class="form-check-label" for="recuerdoCheck">¿Recordar seguimiento?</label>
+                        </div>
+                        <div class="mb-3" id="recuerdoFechaContainer" style="display:none;">
+                            <label for="fecha_recuerdo" class="form-label">Fecha de Recuerdo</label>
+                            <input type="date" class="form-control" id="fecha_recuerdo" name="fecha_recuerdo">
+                        </div>
+
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -253,16 +309,40 @@ include('header.php')
         </div>but
     </div>
     <script>
-        function openModal(id, name, phone, email, description, status, channel) {
-            document.getElementById('clientModalLabel').innerText = 'Editar Cliente';
-            document.getElementById('clientId').value = id;
-            document.getElementById('name').value = name;
-            document.getElementById('phone').value = phone;
-            document.getElementById('email').value = email;
-            document.getElementById('description').value = description.replace(/\\n/g, "\n"); // Manejar saltos de línea
-            document.getElementById('status').value = status || 'Nuevo';
-            document.getElementById('channel').value = channel || '';
+        function openModal(id, name, phone, email, description, status, channel, fecha_recuerdo = '') {
+    // Asignar valores básicos
+    document.getElementById('clientId').value = id;
+    document.getElementById('name').value = name;
+    document.getElementById('phone').value = phone;
+    document.getElementById('email').value = email;
+    document.getElementById('description').value = description.replace(/\\n/g, "\n");
+    document.getElementById('status').value = status || 'Nuevo';
+    document.getElementById('channel').value = channel || '';
+    
+    // Manejo de la fecha de recuerdo
+    const recuerdoInput = document.getElementById('fecha_recuerdo');
+    const recuerdoCheck = document.getElementById('recuerdoCheck');
+    const recuerdoContainer = document.getElementById('recuerdoFechaContainer');
+    
+    if (fecha_recuerdo && fecha_recuerdo !== '0000-00-00' && fecha_recuerdo !== '') {
+        recuerdoCheck.checked = true;
+        recuerdoInput.value = fecha_recuerdo;
+        recuerdoContainer.style.display = 'block';
+    } else {
+        recuerdoCheck.checked = false;
+        recuerdoInput.value = '';
+        recuerdoContainer.style.display = 'none';
+    }
+    
+    // Event listener para el checkbox
+    recuerdoCheck.addEventListener('change', function() {
+        recuerdoContainer.style.display = this.checked ? 'block' : 'none';
+        if (!this.checked) {
+            recuerdoInput.value = '';
         }
+    });
+}
+
         $(document).ready(function () {
             $('#tracintable1').DataTable({
                 paging: true,
@@ -285,6 +365,30 @@ include('header.php')
                 }
             });
         });
+        $(document).ready(function () {
+    // Si viene el parámetro ?filtro=recordatorios_hoy en la URL
+     const urlParams = new URLSearchParams(window.location.search);
+    const filtro = urlParams.get('filtro');
+
+    if (filtro === 'recordatorios_hoy') {
+        setTimeout(() => {
+            filtrarRecuerdo('futuro');
+            $('html, body').animate({
+                scrollTop: $("#tracintable1").offset().top
+            }, 600);
+        }, 500);
+    }
+
+    if (filtro === 'recordatorios_pasados') {
+        setTimeout(() => {
+            filtrarRecuerdo('pasado');
+            $('html, body').animate({
+                scrollTop: $("#tracintable1").offset().top
+            }, 600);
+        }, 500);
+    }
+});
+
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -300,6 +404,52 @@ include('header.php')
             }
         }
     </script>
+    
+<script>
+function filtrarRecuerdo(tipo) {
+    const tabla = $('#tracintable1').DataTable();
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0); // GMT-5 cero hora
+
+    tabla.page.len(100); // mostrar 100 filas al filtrar
+
+    tabla.rows().every(function () {
+        const fila = $(this.node());
+        const fechaTexto = fila.find('td:eq(4)').text().trim();
+        const registradoPor = fila.find('td:eq(0)').find('small').text().replace('por ', '').trim();
+        const esClienteDelUsuario = isAdmin || (registradoPor === currentUser);
+
+        if (!esClienteDelUsuario || !fechaTexto) {
+            fila.addClass('ocultar-fila');
+            return;
+        }
+
+        const fecha = new Date(fechaTexto + 'T00:00:00-05:00');
+        const esFuturo = fecha >= hoy;
+        const esPasado = fecha < hoy;
+
+        if ((tipo === 'futuro' && esFuturo) || (tipo === 'pasado' && esPasado)) {
+            fila.removeClass('ocultar-fila');
+        } else {
+            fila.addClass('ocultar-fila');
+        }
+    });
+
+    tabla.draw();
+}
+
+function resetFiltro() {
+    const tabla = $('#tracintable1').DataTable();
+    tabla.page.len(10); // volver a 10 filas por página
+
+    tabla.rows().every(function () {
+        $(this.node()).removeClass('ocultar-fila');
+    });
+
+    tabla.draw();
+}
+
+</script>
 
 </body>
 

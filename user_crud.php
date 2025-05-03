@@ -1,5 +1,5 @@
 <?php
-require 'db.php';
+require_once 'db.php';
 
 if (isset($_COOKIE['user_session'])) {
     $user_data = json_decode(base64_decode($_COOKIE['user_session']), true);
@@ -90,6 +90,12 @@ if ($action === 'delete' && $id) {
 
 // Obtener lista de usuarios
 $users = $pdo->query("SELECT id, username, role, created_at FROM users")->fetchAll();
+// Obtener todos los turnos de todos los usuarios en una sola consulta
+$stmt = $pdo->query("SELECT user_id, shift FROM user_shifts");
+$user_turnos = [];
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    $user_turnos[$row['user_id']][] = $row['shift'];
+}
 
 
 foreach ($users as $user) {
@@ -133,9 +139,8 @@ include('header.php')
             <?php foreach ($users as $user): ?>
                 <?php
                 // Obtener los turnos asignados al usuario
-                $stmt = $pdo->prepare("SELECT shift FROM user_shifts WHERE user_id = ?");
-                $stmt->execute([$user['id']]);
-                $user_shifts = $stmt->fetchAll(PDO::FETCH_COLUMN);
+                $user_shifts = $user_turnos[$user['id']] ?? [];
+
                 ?>
                 <tr>
                     <td><?= $user['id'] ?></td>

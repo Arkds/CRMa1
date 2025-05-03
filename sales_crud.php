@@ -22,32 +22,36 @@ if (isset($_COOKIE['user_session'])) {
     header("Location: login.php");
     exit;
 }
-require 'db.php';
+require_once 'db.php';
 
 // Función para asignar puntos por venta
-function asignarPuntosVenta($pdo, $venta_id, $user_id, $price, $currency)
+function asignarPuntosVenta($pdo, $venta_id, $user_id, $price, $currency, $quantity)
 {
     // Verificar si cumple los criterios para puntos
-    $es_valida = ($currency == 'MXN' && $price > 150) || ($currency == 'PEN' && $price > 29.90);
+    $es_valida = $price >= 1;
+
 
     if ($es_valida) {
         $pdo->beginTransaction();
 
         try {
-            // 1. Asignar 180 puntos al usuario
-            $stmt = $pdo->prepare("UPDATE users SET puntos_historicos = puntos_historicos + 180 WHERE id = ?");
-            $stmt->execute([$user_id]);
+            $puntos = 50 * intval($quantity); // 50 puntos por unidad
+
+            // 1. Asignar puntos al usuario
+            $stmt = $pdo->prepare("UPDATE users SET puntos_historicos = puntos_historicos + ? WHERE id = ?");
+            $stmt->execute([$puntos, $user_id]);
 
             // 2. Registrar en el historial de puntos
             $stmt = $pdo->prepare("INSERT INTO historial_puntos_historicos 
                                  (user_id, puntos, tipo, comentario) 
-                                 VALUES (?, 180, 'venta_normal', ?)");
-            $comentario = "Venta #$venta_id - " . ($currency == 'MXN' ? "$" . number_format($price, 2) . " MXN" : "S/" . number_format($price, 2));
-            $stmt->execute([$user_id, $comentario]);
+                                 VALUES (?, ?, 'venta_normal', ?)");
+            $comentario = "Venta #$venta_id - {$quantity} unid. - " . 
+                         ($currency == 'MXN' ? "$" . number_format($price, 2) . " MXN" : "S/" . number_format($price, 2));
+            $stmt->execute([$user_id, $puntos, $comentario]);
 
             // 3. Marcar venta como procesada y guardar puntos asignados
-            $stmt = $pdo->prepare("UPDATE sales SET puntos_asignados = TRUE, puntos_venta = 180 WHERE id = ?");
-            $stmt->execute([$venta_id]);
+            $stmt = $pdo->prepare("UPDATE sales SET puntos_asignados = TRUE, puntos_venta = ? WHERE id = ?");
+            $stmt->execute([$puntos, $venta_id]);
 
             $pdo->commit();
             return true;
@@ -57,7 +61,7 @@ function asignarPuntosVenta($pdo, $venta_id, $user_id, $price, $currency)
             return false;
         }
     } else {
-        // Marcar venta como procesada (aunque no cumpla criterios)
+        // Marcar venta como procesada aunque no cumpla criterio
         $pdo->prepare("UPDATE sales SET puntos_asignados = TRUE WHERE id = ?")->execute([$venta_id]);
         return false;
     }
@@ -66,8 +70,10 @@ function asignarPuntosVenta($pdo, $venta_id, $user_id, $price, $currency)
 $isAdmin = isset($role) && $role === 'admin';
 
 // Consultar productos disponibles
-$productsQuery = "SELECT name FROM products";
+$productsQuery = "SELECT name, price, description FROM products";
+
 $stmt = $pdo->query($productsQuery);
+
 $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 //obtener horarios
 $stmt = $pdo->prepare("SELECT shift FROM user_shifts WHERE user_id = ?");
@@ -101,8 +107,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$productName, $price, $quantity, $user_id, $currency, $saleType, $clientPhone, $observations]);
         $venta_id = $pdo->lastInsertId();
 
-        // Asignar puntos automáticamente
-        asignarPuntosVenta($pdo, $venta_id, $user_id, $price, $currency);
+    asignarPuntosVenta($pdo, $venta_id, $user_id, $price, $currency, $quantity);
+
+
     } elseif ($action === 'edit' && $id) {
         // Obtener datos actuales de la venta
         $stmt = $pdo->prepare("SELECT price, currency, puntos_asignados FROM sales WHERE id = ?");
@@ -125,7 +132,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             !$venta_actual['puntos_asignados'] &&
             ($venta_actual['price'] != $price || $venta_actual['currency'] != $currency)
         ) {
-            asignarPuntosVenta($pdo, $id, $user_id, $price, $currency);
+
+
+
         }
     }
     setcookie('success_message', "¡Venta " . ($action === 'edit' ? 'actualizada' : 'registrada') . " en $currency!", time() + 5, "/");
@@ -153,6 +162,8 @@ if ($action === 'edit' && $id) {
     $stmt->execute([$id]);
     $saleToEdit = $stmt->fetch();
 }
+$stmt = null;
+
 include('header.php')
 
     ?>
@@ -228,9 +239,10 @@ include('header.php')
                     value="<?= $saleToEdit['product_name'] ?? ' ' ?>" required>
                 <datalist id="productList">
                     <?php foreach ($products as $product): ?>
-                        <option value="<?= htmlspecialchars($product['name']) ?>"></option>
+                        <option value="<?= htmlspecialchars($product['description'] . '|' . $product['name']) ?>"></option>
                     <?php endforeach; ?>
                 </datalist>
+
             </div>
 
             <div class="col-md-2">
@@ -562,7 +574,29 @@ include('header.php')
         }
     });
 </script>
+<script>
+    const productInput = document.getElementById('product_name');
+    const priceInput = document.getElementById('price');
+    const productData = <?= json_encode($products) ?>;
+
+    productInput.addEventListener('input', function () {
+        const selectedValue = this.value;
+        const parts = selectedValue.split('|');
+        if (parts.length === 2) {
+            const productName = parts[1].trim();
+            const product = productData.find(p => p.name === productName);
+            if (product) {
+                priceInput.value = product.price;
+            }
+        }
+    });
+</script>
+
 
 </body>
+<?php $pdo = null;?>
+<?php
+unset($stmt);
+?>
 
 </html>

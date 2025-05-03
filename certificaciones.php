@@ -9,6 +9,27 @@ if (!ob_get_level()) {
     ob_start();
 }
 
+
+if (isset($_COOKIE['user_session'])) {
+    // Decodificar la cookie
+    $user_data = json_decode(base64_decode($_COOKIE['user_session']), true);
+
+    if ($user_data) {
+        // Variables disponibles para usar en la página
+        $user_id = $user_data['user_id'];
+        $username = $user_data['username'];
+        $role = $user_data['role'];
+    } else {
+        // Si hay un problema con la cookie, redirigir al login
+        header("Location: login.php");
+        exit;
+    }
+} else {
+    // Si no hay cookie, redirigir al login
+    header("Location: login.php");
+    exit;
+}
+
 // Iniciar sesión
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -21,7 +42,9 @@ if (isset($_COOKIE['user_session'])) {
         $_SESSION['user_id'] = $user_data['user_id'];
         $_SESSION['username'] = $user_data['username'];
         $_SESSION['role'] = $user_data['role'];
+
     } else {
+
         header("Location: login.php");
         exit;
     }
@@ -100,9 +123,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_certificado'])
     if ($action === 'create') {
         try {
             $stmt = $pdo->prepare("INSERT INTO certificados_emitidos 
-                             (codigo_unico, curso_id, cliente_nombre, cliente_email, 
-                              es_especial, nombre_curso_manual, user_id) 
-                             VALUES (?, ?, ?, ?, ?, ?, ?)");
+                    (codigo_unico, curso_id, cliente_nombre, cliente_email, 
+                     es_especial, nombre_curso_manual, user_id,
+                     fecha_inicio, fecha_fin, duracion_horas) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
             $result = $stmt->execute([
                 $codigo_unico,
@@ -111,11 +135,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_certificado'])
                 $cliente_email,
                 $es_especial ? 1 : 0,
                 $nombre_curso_manual,
-                $user_id
+                $user_id,
+                $_POST['fecha_inicio'],
+                $_POST['fecha_fin'],
+                $_POST['duracion_horas']
             ]);
             if (!$result) {
                 throw new Exception("Error al guardar: " . implode(" ", $stmt->errorInfo()));
             }
+            if (!empty($_POST['temas_json'])) {
+                $temas = json_decode($_POST['temas_json'], true);
+                if (is_array($temas)) {
+                    $cert_id = $pdo->lastInsertId() ?: $id;
+                    $stmtTema = $pdo->prepare("INSERT INTO certificado_temas (certificado_id, titulo_tema, nota) VALUES (?, ?, ?)");
+                    foreach ($temas as $tema) {
+                        $stmtTema->execute([$cert_id, $tema['tema'], $tema['nota']]);
+                    }
+                }
+            }
+
 
             $_SESSION['success_message'] = "Certificado generado correctamente!";
             header("Location: certificaciones.php");
@@ -145,13 +183,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_certificado'])
             }
 
             $stmt = $pdo->prepare("UPDATE certificados_emitidos SET 
-                                 codigo_unico = ?,
-                                 curso_id = ?,
-                                 cliente_nombre = ?,
-                                 cliente_email = ?,
-                                 es_especial = ?,
-                                 nombre_curso_manual = ?
-                                 WHERE id = ?");
+                codigo_unico = ?, curso_id = ?, cliente_nombre = ?, cliente_email = ?, 
+                es_especial = ?, nombre_curso_manual = ?, fecha_inicio = ?, 
+                fecha_fin = ?, duracion_horas = ?
+                WHERE id = ?");
 
             $result = $stmt->execute([
                 $codigo_unico,
@@ -160,12 +195,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_certificado'])
                 $cliente_email,
                 $es_especial ? 1 : 0,
                 $nombre_curso_manual,
+                $_POST['fecha_inicio'],
+                $_POST['fecha_fin'],
+                $_POST['duracion_horas'],
                 $id
             ]);
 
             if (!$result) {
                 throw new Exception("Error al actualizar: " . implode(" ", $stmt->errorInfo()));
             }
+            // Si hay temas enviados, eliminar los antiguos y guardar los nuevos
+            if (!empty($_POST['temas_json'])) {
+                // Eliminar anteriores
+                $pdo->prepare("DELETE FROM certificado_temas WHERE certificado_id = ?")->execute([$id]);
+            
+                // Insertar nuevos
+                $temas = json_decode($_POST['temas_json'], true);
+                if (is_array($temas)) {
+                    $stmtTema = $pdo->prepare("INSERT INTO certificado_temas (certificado_id, titulo_tema, nota) VALUES (?, ?, ?)");
+                    foreach ($temas as $tema) {
+                        $stmtTema->execute([$id, $tema['tema'], $tema['nota']]);
+                    }
+                }
+            }
+
 
             $_SESSION['success_message'] = "Certificado actualizado correctamente!";
             header("Location: certificaciones.php");
@@ -191,6 +244,17 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_certificado' && isset($_G
         // Obtener datos adicionales para el formulario
         $certificado['es_especial_checked'] = $certificado['es_especial'] ? 1 : 0;
         $certificado['nombre_curso_manual_value'] = $certificado['nombre_curso_manual'] ?? '';
+        
+        // Añadir fechas y duración
+        $certificado['fecha_inicio_value'] = $certificado['fecha_inicio'] ?? '';
+        $certificado['fecha_fin_value'] = $certificado['fecha_fin'] ?? '';
+        $certificado['duracion_horas_value'] = $certificado['duracion_horas'] ?? '';
+        // Obtener temas del reverso
+        $stmt = $pdo->prepare("SELECT titulo_tema, nota FROM certificado_temas WHERE certificado_id = ?");
+        $stmt->execute([$certificado['id']]);
+        $temas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $certificado['temas'] = $temas;
+
 
         // Solo buscar prefijo si no es especial
         if (!$certificado['es_especial']) {
@@ -206,7 +270,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_certificado' && isset($_G
     echo json_encode($certificado ?: []);
     exit;
 }
-
 // Obtener datos para mostrar
 $cursos = $pdo->query("SELECT * FROM cursos_certificados")->fetchAll();
 $certificados = $pdo->query("
@@ -231,6 +294,9 @@ if ($action === 'edit' && $id) {
 }
 
 include('header.php');
+
+$pdo = null;
+
 ?>
 
 <div class="container mt-5">
@@ -360,6 +426,51 @@ include('header.php');
                         <label for="cliente_email" class="form-label">Email del Cliente</label>
                         <input type="email" class="form-control" id="cliente_email" name="cliente_email">
                     </div>
+                    
+                    <!-- Fechas del curso -->
+                    <div class="mb-3">
+                        <label for="fecha_inicio" class="form-label">Fecha de Inicio</label>
+                        <input type="date" class="form-control" id="fecha_inicio" name="fecha_inicio" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="fecha_fin" class="form-label">Fecha de Finalización</label>
+                        <input type="date" class="form-control" id="fecha_fin" name="fecha_fin" required>
+                    </div>
+                    
+                    <!-- Duración en horas -->
+                    <div class="mb-3">
+                        <label for="duracion_horas" class="form-label">Duración (horas académicas)</label>
+                        <input type="number" class="form-control" id="duracion_horas" name="duracion_horas" min="1" required>
+                    </div>
+                    
+                    <!-- Checkbox para activar reverso -->
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="habilitar_reverso">
+                        <label class="form-check-label" for="habilitar_reverso">Agregar información del reverso</label>
+                    </div>
+                    
+                    <!-- Contenedor del reverso -->
+                    <div id="reverso_container" style="display: none;">
+                        <h6>Temas del curso y notas</h6>
+                        <table class="table table-bordered" id="tablaTemas">
+                            <thead>
+                                <tr>
+                                    <th>Tema</th>
+                                    <th>Nota</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                        <button type="button" class="btn btn-secondary mb-2" id="agregarTema">Agregar Tema</button>
+                        <div class="mb-3">
+                            <label for="promedio_final">Promedio Final</label>
+                            <input type="text" class="form-control" id="promedio_final" readonly>
+                        </div>
+                    </div>
+
+
 
                     <button type="submit" class="btn btn-primary">Guardar</button>
                 </form>
@@ -385,22 +496,23 @@ include('header.php');
         let currentCertificadoId = null;
 
         // Configurar modal para edición
-        $(document).on('click', '.editar-btn', function () {
+        // Configurar modal para edición
+        $(document).on('click', '.editar-btn', function() {
             const id = $(this).data('id');
             currentAction = 'edit';
             currentCertificadoId = id;
-
-            $.get('certificaciones.php?action=get_certificado&id=' + id, function (data) {
+            
+            $.get('certificaciones.php?action=get_certificado&id=' + id, function(data) {
                 if (data) {
                     $('#certificadoModalLabel').text('Editar Certificado');
                     $('#formAction').val('edit');
                     $('#certificadoId').val(id);
-
+                    
                     // Resetear estado del formulario
                     $('#es_especial').prop('checked', false).trigger('change');
                     $('#curso_input').prop('disabled', false).val('');
                     $('#curso_id').val('');
-
+                    
                     // Manejar certificados especiales
                     if (data.es_especial_checked) {
                         $('#es_especial').prop('checked', true).trigger('change');
@@ -411,18 +523,44 @@ include('header.php');
                         const cursoOption = $(`#cursos_list option[data-id="${data.curso_id}"]`);
                         if (cursoOption.length) {
                             $('#curso_input').val(cursoOption.val())
-                                .removeClass('is-invalid')
-                                .addClass('is-valid');
+                                            .removeClass('is-invalid')
+                                            .addClass('is-valid');
                             $('#curso_id').val(data.curso_id);
                             $('#prefijo-display').text(cursoOption.data('prefijo') || 'PREFIJO');
                             cursoValidoSeleccionado = true;
                         }
                     }
-
+                    
+                    // Rellenar campos de fechas y duración
+                    $('#fecha_inicio').val(data.fecha_inicio_value);
+                    $('#fecha_fin').val(data.fecha_fin_value);
+                    $('#duracion_horas').val(data.duracion_horas_value);
+                    
                     $('#codigo_unico').val(data.codigo_unico);
                     $('#cliente_nombre').val(data.cliente_nombre);
                     $('#cliente_email').val(data.cliente_email);
                 }
+                // Mostrar temas si existen
+                if (data.temas && data.temas.length > 0) {
+                    $('#habilitar_reverso').prop('checked', true).trigger('change');
+                    $('#tablaTemas tbody').empty();
+                
+                    data.temas.forEach(function (tema) {
+                        const fila = `
+                            <tr>
+                                <td><input type="text" class="form-control tema" value="${tema.titulo_tema}" required></td>
+                                <td><input type="number" class="form-control nota" value="${tema.nota}" step="0.01" min="0" max="20" required></td>
+                                <td><button type="button" class="btn btn-danger btn-sm eliminarFila">Eliminar</button></td>
+                            </tr>
+                        `;
+                        $('#tablaTemas tbody').append(fila);
+                    });
+                
+                    calcularPromedio();
+                } else {
+                    $('#habilitar_reverso').prop('checked', false).trigger('change');
+                }
+
             }, 'json');
         });
 
@@ -448,6 +586,35 @@ include('header.php');
                 $('#nombre_curso_manual').focus();
                 return false;
             }
+            
+            if (reversoAct) {
+                const temas = [];
+                $('#tablaTemas tbody tr').each(function () {
+                    const tema = $(this).find('.tema').val().trim();
+                    const nota = parseFloat($(this).find('.nota').val());
+                    if (tema && !isNaN(nota)) {
+                        temas.push({ tema, nota });
+                    }
+                });
+            
+                if (temas.length === 0) {
+                    alert('Debe agregar al menos un tema con nota válida');
+                    return false;
+                }
+            
+                // Guardar en hidden para enviarlo por POST
+                if ($('#temas_input').length === 0) {
+                    $('<input>').attr({
+                        type: 'hidden',
+                        name: 'temas_json',
+                        id: 'temas_input',
+                        value: JSON.stringify(temas)
+                    }).appendTo('#certificadoForm');
+                } else {
+                    $('#temas_input').val(JSON.stringify(temas));
+                }
+            }
+
 
             return true;
         });
@@ -575,6 +742,51 @@ include('header.php');
                 cursoValidoSeleccionado = false;
             }
         });
+        
+        let reversoAct = false;
+
+        $('#habilitar_reverso').change(function () {
+            reversoAct = this.checked;
+            $('#reverso_container').toggle(reversoAct);
+        });
+        
+        // Agregar fila de tema
+        $('#agregarTema').click(function () {
+            const nuevaFila = `
+                <tr>
+                    <td><input type="text" class="form-control tema" required></td>
+                    <td><input type="number" class="form-control nota" step="0.01" min="0" max="20" required></td>
+                    <td><button type="button" class="btn btn-danger btn-sm eliminarFila">Eliminar</button></td>
+                </tr>`;
+            $('#tablaTemas tbody').append(nuevaFila);
+            calcularPromedio();
+        });
+        
+        // Eliminar fila
+        $(document).on('click', '.eliminarFila', function () {
+            $(this).closest('tr').remove();
+            calcularPromedio();
+        });
+        
+        // Calcular promedio
+        $(document).on('input', '.nota', function () {
+            calcularPromedio();
+        });
+        
+        function calcularPromedio() {
+            let total = 0;
+            let count = 0;
+            $('.nota').each(function () {
+                const val = parseFloat($(this).val());
+                if (!isNaN(val)) {
+                    total += val;
+                    count++;
+                }
+            });
+            const promedio = count > 0 ? (total / count).toFixed(2) : '';
+            $('#promedio_final').val(promedio);
+        }
+
 
         // Validar antes de enviar - MODIFICADO
         $('#certificadoForm').on('submit', function (e) {
@@ -615,42 +827,5 @@ include('header.php');
 
             return true;
         });
-
-        // Configurar modal para edición - VERSIÓN ACTUALIZADA
-        // En el JavaScript, actualiza la función de edición:
-        /*$(document).on('click', '.editar-btn', function() {
-            const id = $(this).data('id');
-            currentAction = 'edit';
-            currentCertificadoId = id;
-            
-            $.get('certificaciones.php?action=get_certificado&id=' + id, function(data) {
-                if (data) {
-                    $('#certificadoModalLabel').text('Editar Certificado');
-                    $('#formAction').val('edit');
-                    $('#certificadoId').val(id);
-                    
-                    // Manejar certificados especiales
-                    if (data.es_especial_checked) {
-                        $('#es_especial').prop('checked', true).trigger('change');
-                        $('#nombre_curso_manual').val(data.nombre_curso_manual_value);
-                        $('#prefijo-display').text('ESP-');
-                    } else {
-                        // Manejar certificados normales
-                        const cursoOption = $(`#cursos_list option[data-id="${data.curso_id}"]`);
-                        if (cursoOption.length) {
-                            $('#curso_input').val(cursoOption.val())
-                                            .removeClass('is-invalid')
-                                            .addClass('is-valid');
-                            $('#curso_id').val(data.curso_id);
-                            $('#prefijo-display').text(cursoOption.data('prefijo') || 'PREFIJO');
-                        }
-                    }
-                    
-                    $('#codigo_unico').val(data.codigo_unico);
-                    $('#cliente_nombre').val(data.cliente_nombre);
-                    $('#cliente_email').val(data.cliente_email);
-                }
-            }, 'json');
-        });*/
     });
 </script>

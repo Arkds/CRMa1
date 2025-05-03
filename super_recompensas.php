@@ -1,25 +1,9 @@
+
 <?php
 
-if (isset($_COOKIE['user_session'])) {
-    // Decodificar la cookie
-    $user_data = json_decode(base64_decode($_COOKIE['user_session']), true);
 
-    if ($user_data) {
-        // Variables disponibles para usar en la página
-        $user_id = $user_data['user_id'];
-        $username = $user_data['username'];
-        $role = $user_data['role'];
-    } else {
-        // Si hay un problema con la cookie, redirigir al login
-        header("Location: login.php");
-        exit;
-    }
-} else {
-    // Si no hay cookie, redirigir al login
-    header("Location: login.php");
-    exit;
-}
 require 'db.php';
+
 
 // Verificar autenticación
 if (!isset($_COOKIE['user_session'])) {
@@ -30,15 +14,16 @@ if (!isset($_COOKIE['user_session'])) {
 $stmt = $pdo->query("SELECT ultima_fecha_grupal FROM metadatos_reseteo LIMIT 1");
 $metadatos = $stmt->fetch();
 
-if (!$metadatos) {
-    if ($isAdmin) {
-        $_SESSION['error'] = "El programa de puntos históricos no ha sido iniciado. <a href='iniciar_programa_puntos.php'>Configurar ahora</a>";
-    } else {
-        $_SESSION['error'] = "El programa de puntos históricos no está activo actualmente.";
-    }
-    header("Location: index.php");
-    exit;
-}
+//if (!$metadatos) {
+//    if ($isAdmin) {
+//        $_SESSION['error'] = "El programa de puntos históricos no ha sido iniciado. <a href='iniciar_programa_puntos.php'>Configurar ahora</a>";
+//    } else {
+//        $_SESSION['error'] = "El programa de puntos históricos no está activo actualmente.";
+//    }
+
+//    header("Location: super_recompensas.php");
+//    exit;
+//}
 $user_data = json_decode(base64_decode($_COOKIE['user_session']), true);
 $user_id = $user_data['user_id'];
 $username = $user_data['username'];
@@ -52,16 +37,31 @@ $puntos_historicos = $user['puntos_historicos'] ?? 0;
 $drive_folder = $user['drive_folder'];
 
 // Definir recompensas históricas
-$recompensas_historicas = [
+/*$recompensas_historicas = [
     8000 => "Snack o bebida",
     15000 => "Entrada al cine",
     25000 => "Bono Yape S/30",
     50000 => "Día libre",
     120000 => "Audífonos Bluetooth",
     200000 => "Teclado mecánico o silla gamer simple",
-    550000 => "¡TV, consola o laptop básica! (Desafío a largo plazo)"
+    350000 => "Viaje doble pagado",
+    550000 => "¡TV, consola o laptop básica! "
+    
+];*/
+$recompensas_historicas = [
+    40000 => "Snack o bebida",
+    100000 => "Entrada al cine",
+    170000 => "Bono Yape S/30",
+    280000 => "Audífonos",
+    500000 => "Teclado",
+    850000 => "Día libre",
+    1600000 => "Tablet",
+    2800000 => "TV - laptop básica ",
+    4000000 => "¡Viaje doble pagado! "
+    
 ];
 
+// Procesar acciones del admin
 if ($isAdmin && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['aprobar_solicitud']) || isset($_POST['rechazar_solicitud'])) {
         $solicitud_id = $_POST['solicitud_id'];
@@ -78,6 +78,7 @@ if ($isAdmin && $_SERVER['REQUEST_METHOD'] === 'POST') {
                     default => 0
                 };
 
+                // Actualizar puntos y marcar como aprobado
                 $pdo->beginTransaction();
                 $stmt = $pdo->prepare("UPDATE users SET puntos_historicos = puntos_historicos + ? WHERE id = ?");
                 $stmt->execute([$puntos, $solicitud['user_id']]);
@@ -175,7 +176,9 @@ $stmt = $pdo->prepare("SELECT h.*, u.username as admin_username
                       FROM historial_puntos_historicos h
                       LEFT JOIN users u ON h.admin_id = u.id
                       WHERE h.user_id = ?
+                      AND h.fecha_registro >= DATE_SUB(NOW(), INTERVAL 7 DAY)
                       ORDER BY h.fecha_registro DESC");
+
 $stmt->execute([$user_id]);
 $historial = $stmt->fetchAll();
 
@@ -304,7 +307,7 @@ include('header.php');
             <h3>Historial de Puntos</h3>
         </div>
         <div class="card-body">
-            <table class="table table-striped">
+            <table class="table table-striped display compact" id="mitabla">
                 <thead>
                     <tr>
                         <th>Fecha</th>
@@ -322,7 +325,7 @@ include('header.php');
                             <td><?= $registro['puntos'] >= 0 ? '+' : '' ?><?= $registro['puntos'] ?></td>
                             <td>
                                 <?= match ($registro['tipo']) {
-                                    'venta_normal' => 'Venta normal (+180 pts)',
+                                    'venta_normal' => 'Venta normal (+50 pts)',
                                     'venta_dificil' => 'Venta difícil (+100 pts)',
                                     'seguimiento_3ventas' => 'Seguimiento con 3 ventas (+300 pts)',
                                     'sin_errores_semana' => 'Semana sin errores (+100 pts)',
@@ -384,13 +387,7 @@ include('header.php');
                             </div>
                         </div>
 
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label class="form-label">Evidencia (opcional)</label>
-                                <input type="file" name="evidencia" class="form-control">
-                                <small class="text-muted">Se guardará en la carpeta de Drive del vendedor</small>
-                            </div>
-                        </div>
+                        
                     </div>
 
                     <div class="mb-3">
@@ -453,7 +450,7 @@ include('header.php');
                 <?php if (!empty($solicitudes_puntos)): ?>
                     <div class="mt-4">
                         <h5>Tus solicitudes recientes</h5>
-                        <table class="table table-sm">
+                        <table class="table table-sm display compact" id="mitabla">
                             <thead>
                                 <tr>
                                     <th>Fecha</th>
@@ -520,7 +517,7 @@ include('header.php');
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-hover">
+                    <table class="table table-hover display compact" id="mitabla">
                         <thead class="table-light">
                             <tr>
                                 <th>Fecha</th>
@@ -552,7 +549,7 @@ include('header.php');
                                     </td>
                                     <td><?= !empty($solicitud['comentario']) ? htmlspecialchars($solicitud['comentario']) : '--' ?>
                                     </td>
-                                    <td>
+                                    
                                     <td>
                                         <div class="d-flex gap-2">
                                             <form method="POST" class="mb-0">
@@ -568,7 +565,7 @@ include('header.php');
                                             </button>
                                         </div>
                                     </td>
-                                    </td>
+                                    
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -646,6 +643,21 @@ include('header.php');
         const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
         tooltipTriggerList.map(function (tooltipTriggerEl) {
             return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+</script>
+
+
+<script>
+    $(document).ready(function () {
+        $('#mitabla').DataTable({
+            paging: true,
+            searching: true,
+            ordering: true,
+            order: [[0, 'desc']],
+            language: {
+                url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
+            }
         });
     });
 </script>

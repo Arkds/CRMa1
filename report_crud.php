@@ -49,7 +49,8 @@ if ($action === 'get_report' && isset($_GET['id'])) {
     $dudas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // Obtener clientes potenciales
-    $stmt = $pdo->prepare("SELECT id, name, phone, email, description, status, channel FROM report_clients WHERE report_id = ?");
+// En la parte donde obtienes los clientes potenciales:
+    $stmt = $pdo->prepare("SELECT id, name, phone, email, description, status, channel, fecha_recuerdo FROM report_clients WHERE report_id = ?");
     $stmt->execute([$report_id]);
     $clientes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -121,13 +122,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $description = isset($cliente['description']) ? trim($cliente['description']) : '';
                 $status = isset($cliente['status']) ? trim($cliente['status']) : 'Nuevo';
                 $channel = isset($cliente['channel']) ? trim($cliente['channel']) : null;
-
+                $fecha_recuerdo = !empty($cliente['fecha_recuerdo']) ? $cliente['fecha_recuerdo'] : null;
+        
                 if (!empty($name)) {
-                    $stmt = $pdo->prepare("INSERT INTO report_clients (report_id, name, phone, email, description, status, channel) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                    $stmt->execute([$report_id, $name, $phone, $email, $description, $status, $channel]);
+                    $stmt = $pdo->prepare("INSERT INTO report_clients (report_id, name, phone, email, description, status, channel, fecha_recuerdo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->execute([$report_id, $name, $phone, $email, $description, $status, $channel, $fecha_recuerdo]);
                 }
             }
         }
+        
 
 
 
@@ -198,17 +201,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $description = isset($cliente['description']) ? trim($cliente['description']) : '';
                     $status = isset($cliente['status']) ? trim($cliente['status']) : 'Nuevo';
                     $channel = isset($cliente['channel']) ? trim($cliente['channel']) : null;
+                    $fecha_recuerdo = !empty($cliente['fecha_recuerdo']) ? $cliente['fecha_recuerdo'] : null;
+
 
                     if (!empty($name)) {
                         // Si el cliente ya existe en la base de datos, se actualiza
                         if (!empty($cliente['id']) && in_array($cliente['id'], $clientes_actuales)) {
-                            $stmt = $pdo->prepare("UPDATE report_clients SET name = ?, phone = ?, email = ?, description = ?, status = ?, channel = ? WHERE id = ?");
-                            $stmt->execute([$name, $phone, $email, $description, $status, $channel, $cliente['id']]);
+                            $stmt = $pdo->prepare("UPDATE report_clients SET name = ?, phone = ?, email = ?, description = ?, status = ?, channel = ?, fecha_recuerdo = ? WHERE id = ?");
+                            $stmt->execute([$name, $phone, $email, $description, $status, $channel, $fecha_recuerdo, $cliente['id']]);
+
                             $clientes_ids_enviados[] = $cliente['id'];
                         } else {
                             // Si el cliente es nuevo, se inserta
-                            $stmt = $pdo->prepare("INSERT INTO report_clients (report_id, name, phone, email, description, status, channel) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                            $stmt->execute([$report_id, $name, $phone, $email, $description, $status, $channel]);
+                            $stmt = $pdo->prepare("INSERT INTO report_clients (report_id, name, phone, email, description, status, channel, fecha_recuerdo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                            $stmt->execute([$report_id, $name, $phone, $email, $description, $status, $channel, $fecha_recuerdo]);
+
                             $clientes_ids_enviados[] = $pdo->lastInsertId();
                         }
                     }
@@ -267,6 +274,10 @@ if ($user_role === 'admin') {
 }
 
 $reports = $stmt->fetchAll();
+
+$stmt = null;
+$pdo = null;
+
 include('header.php')
 ?>
 
@@ -531,49 +542,103 @@ include('header.php')
             <option value="Messenger Hazla">
             <option value="Messenger Premium">
         </datalist>
+        <div class="form-check my-2">
+        <input class="form-check-input activar-recuerdo" type="checkbox" id="recuerdoCheck${index}">
+        <label class="form-check-label" for="recuerdoCheck${index}">¿Recordar seguimiento?</label>
+    </div>
+    <input type="date" name="clientes[${index}][fecha_recuerdo]" class="form-control my-1 fecha-recuerdo" style="display: none;">
+
 
     </div>`;
+
+setTimeout(() => {
+    const check = document.getElementById(`recuerdoCheck${index}`);
+    const input = check.parentElement.nextElementSibling;
+    check.addEventListener('change', () => {
+        input.style.display = check.checked ? 'block' : 'none';
+    });
+}, 100);
 
             container.insertAdjacentHTML("beforeend", input);
         }
 
 
-        function agregarClienteEditar(containerId, id = '', name = '', phone = '', email = '', description = '', status = 'Nuevo', channel = '') {
+        function agregarClienteEditar(containerId, id = '', name = '', phone = '', email = '', description = '', status = 'Nuevo', channel = '', fecha_recuerdo = '') {
             let container = document.getElementById(containerId);
-            let index = container.children.length; // Índice único para cada cliente
+            let index = container.children.length;
+        
+            // Manejar fecha de recuerdo SIN convertir a objeto Date
+            let fechaValue = '';
+            let checked = '';
+            let displayStyle = 'style="display: none;"';
+            
+            if (fecha_recuerdo && fecha_recuerdo !== '0000-00-00' && fecha_recuerdo !== 'NULL') {
+                // Usar la fecha directamente sin conversión
+                fechaValue = fecha_recuerdo.split(' ')[0]; // Por si viene con hora
+                checked = 'checked';
+                displayStyle = '';
+            }
+
 
             let input = `<div class="border p-2 my-2">
-        <input type="hidden" name="editClientes[${index}][id]" value="${id}">
-        <input type="text" name="editClientes[${index}][name]" placeholder="Nombre" class="form-control my-1" value="${name}" required>
-        <input type="text" name="editClientes[${index}][phone]" placeholder="Teléfono" class="form-control my-1" value="${phone}">
-        <input type="email" name="editClientes[${index}][email]" placeholder="Email" class="form-control my-1" value="${email}">
-        <textarea name="editClientes[${index}][description]" placeholder="Descripción" class="form-control my-1">${description}</textarea>
-
-        <!-- Estado -->
-        <select name="editClientes[${index}][status]" class="form-select my-1" required>
-            <option value="Nuevo" ${status === 'Nuevo' ? 'selected' : ''}>Nuevo</option>
-            <option value="Interesado" ${status === 'Interesado' ? 'selected' : ''}>Interesado</option>
-            <option value="Negociación" ${status === 'Negociación' ? 'selected' : ''}>Negociación</option>
-            <option value="Comprometido" ${status === 'Comprometido' ? 'selected' : ''}>Comprometido</option>
-            <option value="Vendido" ${status === 'Vendido' ? 'selected' : ''}>Vendido</option>
-            <option value="Perdido" ${status === 'Perdido' ? 'selected' : ''}>Perdido</option>
-        </select>
-
-        <!-- Canal -->
-        <input type="text" name="clientes[${index}][channel]" placeholder="Canal" class="form-control my-1" list="canales${index}">
+                <input type="hidden" name="editClientes[${index}][id]" value="${id}">
+                <input type="text" name="editClientes[${index}][name]" placeholder="Nombre" class="form-control my-1" value="${name}" required>
+                <input type="text" name="editClientes[${index}][phone]" placeholder="Teléfono" class="form-control my-1" value="${phone}">
+                <input type="email" name="editClientes[${index}][email]" placeholder="Email" class="form-control my-1" value="${email}">
+                <textarea name="editClientes[${index}][description]" placeholder="Descripción" class="form-control my-1">${description}</textarea>
         
-        <!-- Datalist para sugerencias -->
-        <datalist id="canales${index}">
-            <option value="WhatsApp Premium">
-            <option value="WhatsApp Hazla">
-            <option value="Messenger Tx">
-            <option value="Messenger Hazla">
-            <option value="Messenger Premium">
-        </datalist>
-    </div>`;
-
+                <!-- Estado -->
+                <select name="editClientes[${index}][status]" class="form-select my-1" required>
+                    <option value="Nuevo" ${status === 'Nuevo' ? 'selected' : ''}>Nuevo</option>
+                    <option value="Interesado" ${status === 'Interesado' ? 'selected' : ''}>Interesado</option>
+                    <option value="Negociación" ${status === 'Negociación' ? 'selected' : ''}>Negociación</option>
+                    <option value="Comprometido" ${status === 'Comprometido' ? 'selected' : ''}>Comprometido</option>
+                    <option value="Vendido" ${status === 'Vendido' ? 'selected' : ''}>Vendido</option>
+                    <option value="Perdido" ${status === 'Perdido' ? 'selected' : ''}>Perdido</option>
+                </select>
+        
+                <!-- Canal -->
+                <input type="text" name="editClientes[${index}][channel]" placeholder="Canal" class="form-control my-1" list="canales${index}" value="${channel}">
+                
+                <!-- Datalist para sugerencias -->
+                <datalist id="canales${index}">
+                    <option value="WhatsApp Premium">
+                    <option value="WhatsApp Hazla">
+                    <option value="Messenger Tx">
+                    <option value="Messenger Hazla">
+                    <option value="Messenger Premium">
+                </datalist>
+        
+                <!-- Checkbox e input de fecha -->
+                <div class="form-check my-2">
+                        <input class="form-check-input activar-recuerdo" type="checkbox" id="editRecuerdoCheck${index}" ${checked}>
+                        <label class="form-check-label" for="editRecuerdoCheck${index}">¿Recordar seguimiento?</label>
+                    </div>
+                    <input type="date" name="editClientes[${index}][fecha_recuerdo]" class="form-control my-1 fecha-recuerdo" value="${fechaValue}" ${displayStyle}>
+                </div>`;
+        
             container.insertAdjacentHTML("beforeend", input);
+        
+            // Activar comportamiento dinámico del checkbox
+            setTimeout(() => {
+                const check = document.getElementById(`editRecuerdoCheck${index}`);
+                const inputFecha = check.parentElement.nextElementSibling;
+                
+                // Mostrar/ocultar según el estado inicial
+                if (check.checked) {
+                    inputFecha.style.display = 'block';
+                }
+                
+                // Manejar cambios en el checkbox
+                check.addEventListener('change', () => {
+                    inputFecha.style.display = check.checked ? 'block' : 'none';
+                    if (!check.checked) {
+                        inputFecha.value = '';
+                    }
+                });
+            }, 100);
         }
+
 
 
 
@@ -608,8 +673,19 @@ include('header.php')
                     let clientesContainer = document.getElementById("editClientesContainer");
                     clientesContainer.innerHTML = "";
                     data.clientes.forEach(cliente => {
-                        agregarClienteEditar('editClientesContainer', cliente.id, cliente.name, cliente.phone, cliente.email, cliente.description, cliente.status, cliente.channel);
+                        agregarClienteEditar(
+                            'editClientesContainer',
+                            cliente.id,
+                            cliente.name,
+                            cliente.phone,
+                            cliente.email,
+                            cliente.description,
+                            cliente.status,
+                            cliente.channel,
+                            cliente.fecha_recuerdo || ''
+                        );
                     });
+
 
 
                     document.getElementById("editRecomendaciones").value = data.recomendaciones;

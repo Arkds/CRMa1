@@ -1,5 +1,5 @@
 <?php
-require 'db.php';
+require_once 'db.php';
 
 if (isset($_COOKIE['user_session'])) {
     $user_data = json_decode(base64_decode($_COOKIE['user_session']), true);
@@ -327,3 +327,7 @@ include('header.php')
 </body>
 
 </html>
+<?php
+unset($stmt);
+unset($pdo);
+?>

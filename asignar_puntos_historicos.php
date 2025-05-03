@@ -26,43 +26,49 @@ $total_procesadas = 0;
 $total_puntos = 0;
 
 foreach ($ventas_sin_puntos as $venta) {
-    // Verificar si cumple los criterios
-    $es_valida = ($venta['currency'] == 'MXN' && $venta['price'] >= 150) || 
-                ($venta['currency'] == 'PEN' && $venta['price'] >= 29.90);
-    
-    if ($es_valida) {
-        $pdo->beginTransaction();
-        
-        try {
-            // 1. Asignar puntos al usuario
-            $stmt = $pdo->prepare("UPDATE users SET puntos_historicos = puntos_historicos + 180 WHERE id = ?");
-            $stmt->execute([$venta['user_id']]);
-            
-            // 2. Registrar en el historial
-            $stmt = $pdo->prepare("INSERT INTO historial_puntos_historicos 
-                                 (user_id, puntos, tipo, comentario, fecha_registro) 
-                                 VALUES (?, 180, 'venta_normal', ?, ?)");
+    $pdo->beginTransaction();
+
+    try {
+        // Obtener la cantidad de la venta
+        $stmt = $pdo->prepare("SELECT quantity FROM sales WHERE id = ?");
+        $stmt->execute([$venta['id']]);
+        $quantity = (int)$stmt->fetchColumn();
+
+        if ($quantity > 0) {
+            $puntos = $quantity * 50;
+
+            // 1. Asignar puntos
+            $stmt = $pdo->prepare("UPDATE users SET puntos_historicos = puntos_historicos + ? WHERE id = ?");
+            $stmt->execute([$puntos, $venta['user_id']]);
+
+            // 2. Historial
             $comentario = "Venta histórica #{$venta['id']} - " . 
                          ($venta['currency'] == 'MXN' ? "$" . number_format($venta['price'], 2) . " MXN" : 
                          "S/" . number_format($venta['price'], 2));
-            $stmt->execute([$venta['user_id'], $comentario, $venta['created_at']]);
-            
-            // 3. Marcar venta como procesada
-            $stmt = $pdo->prepare("UPDATE sales SET puntos_asignados = TRUE, puntos_venta = 180 WHERE id = ?");
-            $stmt->execute([$venta['id']]);
-            
-            $pdo->commit();
+            $stmt = $pdo->prepare("INSERT INTO historial_puntos_historicos 
+                                 (user_id, puntos, tipo, comentario, fecha_registro) 
+                                 VALUES (?, ?, 'venta_normal', ?, ?)");
+            $stmt->execute([$venta['user_id'], $puntos, $comentario, $venta['created_at']]);
+
+            // 3. Marcar como procesada
+            $stmt = $pdo->prepare("UPDATE sales SET puntos_asignados = TRUE, puntos_venta = ? WHERE id = ?");
+            $stmt->execute([$puntos, $venta['id']]);
+
             $total_procesadas++;
-            $total_puntos += 180;
-        } catch (Exception $e) {
-            $pdo->rollBack();
-            error_log("Error procesando venta ID {$venta['id']}: " . $e->getMessage());
+            $total_puntos += $puntos;
+        } else {
+            // Si cantidad inválida o cero, marcar igualmente para evitar reintentos
+            $stmt = $pdo->prepare("UPDATE sales SET puntos_asignados = TRUE WHERE id = ?");
+            $stmt->execute([$venta['id']]);
         }
-    } else {
-        // Marcar ventas que no cumplen criterio para no procesarlas de nuevo
-        $pdo->prepare("UPDATE sales SET puntos_asignados = TRUE WHERE id = ?")->execute([$venta['id']]);
+
+        $pdo->commit();
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        error_log("Error procesando venta ID {$venta['id']}: " . $e->getMessage());
     }
 }
+  
 
 // Registrar en el log de administración si se ejecuta manualmente
 if (php_sapi_name() !== 'cli') {
@@ -83,7 +89,11 @@ if (php_sapi_name() !== 'cli') {
         'puntos_asignados' => $total_puntos,
         'fecha_inicio_programa' => $fecha_inicio_programa
     ]);
+    $pdo = null; 
 } else {
     // Log para ejecución en segundo plano
     error_log("Proceso automático de puntos ejecutado. Ventas: $total_procesadas, Puntos: $total_puntos");
+    $pdo = null;
 }
+
+

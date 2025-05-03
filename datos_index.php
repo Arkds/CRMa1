@@ -2,6 +2,11 @@
 require 'db.php';
 require 'puntos_personales.php';
 
+$puntos_comisiones = $puntos_comisiones ?? [];
+$puntos_ventas_normales = $puntos_ventas_normales ?? [];
+$puntos_totales = $puntos_totales ?? [];
+
+
 // Autenticación y obtención de datos del usuario
 if (isset($_COOKIE['user_session'])) {
     $user_data = json_decode(base64_decode($_COOKIE['user_session']), true);
@@ -26,17 +31,9 @@ ini_set('display_errors', 1);
 // Obtener productos relevantes
 $products = $pdo->query("SELECT relevance, name, price, description FROM products ORDER BY relevance DESC, name ASC")->fetchAll();
 
-// Constantes de usuarios
-$user_constants = [
-    'Sheyla' => 0.83,
-    'Magaly' => 1.11,
-    'Sonaly' => 1.11,
-    'Frank' => 0.77,
-    'Esther' => 1.33,
-];
 
 // Configuración de rangos de fechas
-$fecha_inicio_formateada = date('d/m/Y', strtotime('-1 days'));
+$fecha_inicio_formateada = date('d/m/Y', strtotime('-7 days'));
 $fecha_fin_formateada = date('d/m/Y');
 $rango_fechas = "Del $fecha_inicio_formateada al $fecha_fin_formateada";
 
@@ -70,22 +67,22 @@ if ($role !== 'admin') {
 $recompensas_grupales = [
     [
         'nombre' => 'Caja de pizza para el turno completo',
-        'puntos_requeridos' => 9000,
+        'puntos_requeridos' => 20000,
         'icono' => '🍕'
     ],
     [
         'nombre' => 'Bono colectivo dividido (ej. S/60 para 3 personas: S/20 cada uno)',
-        'puntos_requeridos' => 15000,
+        'puntos_requeridos' => 25000,
         'icono' => '💰'
     ],
     [
         'nombre' => 'Tarde libre por rotación',
-        'puntos_requeridos' => 21000,
+        'puntos_requeridos' => 30000,
         'icono' => '🏖️'
     ],
     [
         'nombre' => 'Reconocimiento público ("Equipo campeón de la semana")',
-        'puntos_requeridos' => 30000,
+        'puntos_requeridos' => 35000,
         'icono' => '🏆'
     ]
 ];
@@ -241,14 +238,46 @@ function calcularPuntosPorEquipo($pdo, $puntos_individuales, $user_constants, $r
                     $datos_grafico[$venta['fecha']] = ($datos_grafico[$venta['fecha']] ?? 0) + $venta['ventas_validas'];
                 }
             }
+            
 
             // Calcular puntos (180 puntos por venta válida)
-            $total_ventas_validas = array_sum(array_column($ventas_miembro, 'ventas_validas'));
-            $puntos = $total_ventas_validas * 180;
+            // Recalcular puntos por venta válida (hazla = 210, otros = 180)
+            $puntos = 0;
+            
+            $sql_detalles = "
+                SELECT s.product_name, s.quantity
+                FROM sales s
+                WHERE s.user_id = :user_id
+                AND s.created_at BETWEEN :inicio AND :fin
+                AND (
+                    (s.currency = 'MXN' AND s.price >= 150) OR 
+                    (s.currency = 'PEN' AND s.price >= 29.9)
+                )
+                AND DAYNAME(s.created_at) IN ('" . implode("','", $equipo['dias']) . "')
+                AND TIME(s.created_at) BETWEEN :hora_inicio AND :hora_fin
+            ";
+            
+            $stmt_detalles = $pdo->prepare($sql_detalles);
+            $stmt_detalles->execute([
+                'user_id' => $user_id,
+                'inicio' => $primer_dia_mes,
+                'fin' => $ultimo_dia_mes,
+                'hora_inicio' => $horario[0] . ':00',
+                'hora_fin' => $horario[1] . ':00'
+            ]);
+            
+            $ventas_detalle = $stmt_detalles->fetchAll();
+            
+            $total_ventas_validas = 0;
+            foreach ($ventas_detalle as $venta) {
+                $canal = explode('|', $venta['product_name'])[0];
+                $puntos_por_venta = (strtolower(trim($canal)) === 'hazla') ? 210 : 180;
+                $puntos += $puntos_por_venta * $venta['quantity'];
+                $total_ventas_validas += $venta['quantity'];
+            }
 
-            // Aplicar constante del usuario
-            $puntos *= ($user_constants[$miembro] ?? 1);
 
+           
             $ventas_equipo[$miembro] = [
                 'ventas' => $total_ventas_validas,
                 'puntos' => $puntos,
@@ -403,10 +432,11 @@ $tabla_ventas_normales .= '
             </tbody>
         </table>
         <div class="progress mt-3">
-            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar"
-                style="width: ' . ($puntos_totales[$username] / 7500 * 100) . '%">
-                ' . ($puntos_totales[$username] ?? 0) . ' / 7500 pts
-            </div>
+           <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar"
+    style="width: ' . ((isset($puntos_totales[$username]) ? $puntos_totales[$username] : 0) / 7500 * 100) . '%">
+    ' . ($puntos_totales[$username] ?? 0) . ' / 7500 pts
+</div>
+
         </div>
         <div class="alert alert-info mt-3">
             <strong>Rangos de puntos:</strong>
@@ -459,13 +489,13 @@ foreach ($puntos_totales as $vendedor => $total) {
     }
 
     $recompensa = '';
-    if ($total >= 12000) {
+    if ($total >= 20000) {
         $recompensa = '<span class="badge bg-success">Vale S/20</span>';
-    } elseif ($total >= 7500) {
+    } elseif ($total >= 15000) {
         $recompensa = '<span class="badge bg-primary">Suscripción app</span>';
-    } elseif ($total >= 5000) {
+    } elseif ($total >= 10000) {
         $recompensa = '<span class="badge bg-info">Recarga S/10</span>';
-    } elseif ($total >= 3000) {
+    } elseif ($total >= 5000) {
         $recompensa = '<span class="badge bg-warning">Recarga S/5</span>';
     } else {
         $recompensa = '<span class="badge bg-secondary">En progreso</span>';
@@ -603,19 +633,19 @@ $recompensas_disponibles = '
             </thead>
             <tbody>
                 <tr>
-                    <td>3,000</td>
+                    <td>5,000</td>
                     <td>Recarga de S/5 o snack sorpresa</td>
                 </tr>
                 <tr>
-                    <td>5,000</td>
+                    <td>10,000</td>
                     <td>Recarga de S/10 o canjeo de menú</td>
                 </tr>
                 <tr>
-                    <td>7,500</td>
+                    <td>15,000</td>
                     <td>Suscripción de un mes (app)</td>
                 </tr>
                 <tr>
-                    <td>12,000</td>
+                    <td>20,000</td>
                     <td>Vale digital de S/20</td>
                 </tr>
             </tbody>
@@ -633,7 +663,7 @@ $recompensas_grupales_html = '
     <div class="card-body">';
 
 foreach ($puntos_equipos as $nombre => $equipo) {
-    $max_puntos = 30000; // Puntos máximos para la barra de progreso
+    $max_puntos = 35000; // Puntos máximos para la barra de progreso
     
     $recompensas_grupales_html .= '
         <div class="mb-4">
@@ -764,7 +794,7 @@ if ($role !== 'admin') {
         <div class="card-body">';
 
     if ($equipo_usuario) {
-        $max_puntos = 30000; // Puntos máximos para la barra de progreso
+        $max_puntos = 35000; // Puntos máximos para la barra de progreso
         
         $recompensas_equipo .= '
             <h4>Equipo ' . ucfirst($nombre_equipo) . '</h4>

@@ -102,6 +102,7 @@ $productsData = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Convertir los datos a JSON para usarlos en el gráfico
 $productsDataJson = json_encode($productsData);
+$pdo = null;
 
 ?>
 

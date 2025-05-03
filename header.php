@@ -1,4 +1,4 @@
-<?php include 'feedback.php'; ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -36,7 +36,7 @@
 
         /* Espaciado entre elementos */
         .navbar-nav {
-            gap: 10px;
+            gap: 5px;
         }
 
         /* Ajustar el ancho de la barra de navegación */
@@ -84,9 +84,9 @@
 
         /* Casita y flecha más grandes */
         .nav-icons-big {
-            font-size: 2rem;
+            font-size: 1.4rem;
             /* Hace los iconos más grandes */
-            padding: 10px 15px;
+            padding: 1px 2px;
             /* Aumenta el área clickeable */
         }
 
@@ -106,14 +106,14 @@
         <div class="container-fluid">
 
             <!-- Flecha de volver y botón de inicio (casita) -->
-            <div class="d-flex align-items-center gap-3">
+            <div class="d-flex align-items-center gap-1">
                 <button class="nav-link btn btn-link text-white nav-icons-big" onclick="window.history.back();">
                     <i class="bi bi-arrow-left"></i>
                 </button>
-
-                <a class="navbar-brand nav-icons-big" href="index.php">
-                    <i class="bi bi-house"></i>
-                </a>
+                <button class="nav-link btn btn-link text-white nav-icons-big" onclick="window.location.href='index.php';">
+                            <i class="bi bi-house"></i>
+                        </button>
+              
 
                 <button class="nav-link btn btn-link text-white nav-icons-big" onclick="window.location.reload();">
                     <i class="bi bi-arrow-clockwise"></i>
@@ -155,9 +155,9 @@
                         Registrar Ventas
                     </button>
 
-                    <button class="nav-link btn btn-link text-white" onclick="window.location.href='members_crud.php';">
+                    <!--<button class="nav-link btn btn-link text-white" onclick="window.location.href='members_crud.php';">
                         Gestionar Socios
-                    </button>
+                    </button>-->
 
                     <button class="nav-link btn btn-link text-white" onclick="window.location.href='report_crud.php';">
                         Reportes
@@ -166,23 +166,25 @@
                     <button class="nav-link btn btn-link text-white" onclick="window.location.href='tracin_crud.php';">
                         Seguimientos
                     </button>
-                    <button class="nav-link btn btn-link text-white"
-                        onclick="window.location.href='certificaciones.php';">
-                        Certificaciones
-                    </button>
+                    
+                    
+                    <?php if (isset($isAdmin) && $isAdmin): ?>
+                        <button class="nav-link btn btn-link text-white"
+                            onclick="window.location.href='certificaciones.php';">
+                            Certificaciones
+                        </button>
+                    <?php endif; ?>
+                    
                 </div>
-                <div class="ms-auto d-flex gap-3 align-items-center">
-                    <span class="text-white"><em>Usted esta como: </em><strong> <?= htmlspecialchars($username) ?>
-                        </strong></span>
-
-                    <button class="nav-link btn btn-link text-white nav-icons" id="liveAlertBtn">
-                        <i class="bi bi-question-circle"></i>
-                    </button>
-                    <button class="nav-link btn btn-link text-white nav-icons"
+               
+                <div class="ms-auto d-flex gap-2 align-items-center">
+                     <span class="text-white"><em>✓ </em><strong><?= htmlspecialchars($username) ?></strong></span>
+                    
+                    <button class="nav-link btn btn-link text-white nav-icons-big"
                         onclick="window.location.href='super_recompensas.php';">
-                        <i class="bi bi-bar-chart-line""></i>
+                        <i class="bi bi-bar-chart-line"></i>
                     </button>
-                    <button class="nav-link btn btn-link text-white nav-icons"
+                    <button class="nav-link btn btn-link text-white nav-icons-big"
                         onclick="window.location.href='logout.php';">
                         <i class="bi bi-box-arrow-right"></i>
                     </button>

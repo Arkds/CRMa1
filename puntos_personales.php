@@ -15,6 +15,20 @@ function getLastMonday() {
     return $today->format('Y-m-d H:i:s');
 }
 
+
+$user_constants = [
+    'Sheyla' => 0.83,
+    'Magaly' => 1.11,
+    'Sonaly' => 1.11,
+    'Frank' => 0.77,
+    'Esther' => 1.33,
+];
+$canal_constants = [
+    'hazla' => 1.3
+];
+
+
+
 // Obtener el último lunes y la fecha/hora actual
 $inicio_semana = getLastMonday();
 $fin_semana = date('Y-m-d H:i:s');
@@ -67,8 +81,35 @@ $ventas_normales = $stmt_ventas_normales->fetchAll();
 // Resto del código sigue igual...
 foreach ($ventas_normales as $vn) {
     $total_ventas = $vn['ventas_mxn'] + $vn['ventas_pen'];
-    $puntos_base = $total_ventas * 180;
     $constante = $user_constants[$vn['username']] ?? 1;
+
+    // Nueva lógica: obtener las ventas individuales para calcular por producto
+    $stmt = $pdo->prepare("
+        SELECT s.product_name, s.price, s.currency
+        FROM sales s
+        JOIN users u ON s.user_id = u.id
+        WHERE u.username = :username
+        AND s.created_at BETWEEN :inicio AND :fin
+        AND (
+            (s.currency = 'MXN' AND s.price >= 150)
+            OR
+            (s.currency = 'PEN' AND s.price >= 29.9)
+        )
+    ");
+    $stmt->execute([
+        'username' => $vn['username'],
+        'inicio' => $inicio_semana,
+        'fin' => $fin_semana
+    ]);
+    $ventas_validas = $stmt->fetchAll();
+
+    $puntos_base = 0;
+    foreach ($ventas_validas as $venta) {
+        $canal = explode('|', $venta['product_name'])[0];
+        $puntos_por_venta = (strtolower(trim($canal)) === 'hazla') ? 210 : 180;
+        $puntos_base += $puntos_por_venta;
+    }
+
     $puntos_finales = round($puntos_base * $constante);
 
     $puntos_ventas_normales[] = [
@@ -81,6 +122,7 @@ foreach ($ventas_normales as $vn) {
         'puntos_finales' => $puntos_finales
     ];
 }
+
 
 // Sumar puntos totales (solo para esta semana)
 $puntos_totales = [];

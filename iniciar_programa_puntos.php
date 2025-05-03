@@ -126,21 +126,24 @@ if (!$isAdmin) {
 $stmt = $pdo->query("SELECT ultima_fecha_grupal FROM metadatos_reseteo LIMIT 1");
 $metadatos = $stmt->fetch();
 
-if (!$metadatos) {
-    $_SESSION['error'] = "El programa de puntos históricos no ha sido iniciado. <a href='iniciar_programa_puntos.php'>Configurar ahora</a>";
-    header("Location: index.php");
-    exit;
-}
+//if (!$metadatos) {
+//    $_SESSION['error'] = "El programa de puntos históricos no ha sido iniciado. <a href='iniciar_programa_puntos.php'>Configurar ahora</a>";
+//    header("Location: index.php");
+//    exit;
+//}
 
 // Definir recompensas históricas
 $recompensas_historicas = [
-    8000 => "Snack o bebida",
-    15000 => "Entrada al cine",
-    25000 => "Bono Yape S/30",
-    50000 => "Día libre",
-    120000 => "Audífonos Bluetooth",
-    200000 => "Teclado mecánico o silla gamer simple",
-    550000 => "¡TV, consola o laptop básica! (Desafío a largo plazo)"
+    40000 => "Snack o bebida",
+    100000 => "Entrada al cine",
+    170000 => "Bono Yape S/30",
+    280000 => "Audífonos",
+    500000 => "Teclado",
+    850000 => "Día libre",
+    1600000 => "Tablet",
+    2800000 => "TV - laptop básica ",
+    4000000 => "¡Viaje doble pagado! "
+    
 ];
 
 // Procesar acciones del admin
@@ -348,7 +351,7 @@ include('header.php');
             <div class="card-body">
                 <?php foreach ($vendedores as $vendedor): ?>
                     <?php
-                    $max_puntos = 550000; // Puntos de la máxima recompensa
+                    $max_puntos = 4000000; // Puntos de la máxima recompensa
                     $porcentaje = min(100, ($vendedor['puntos_historicos'] / $max_puntos) * 100);
                     ?>
 
@@ -591,6 +594,11 @@ include('header.php');
             border-radius: 5px;
         }
     </style>
+<?php
+if (isset($pdo)) {
+    $pdo = null;
+}
+?>
 
 
     <?php include('footer.php'); ?>
