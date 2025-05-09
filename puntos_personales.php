@@ -18,13 +18,16 @@ function getLastMonday() {
 
 $user_constants = [
     'Sheyla' => 0.83,
-    'Magaly' => 1.11,
-    'Sonaly' => 1.11,
-    'Frank' => 0.77,
-    'Esther' => 1.33,
+    'Magaly' => 1,
+    'Sonaly' => 1,
+    'Frank' => 1,
+    'Esther' => 1,
 ];
+
+
+
 $canal_constants = [
-    'hazla' => 1.3
+    'hazla' => 1
 ];
 
 

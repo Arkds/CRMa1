@@ -45,8 +45,10 @@ if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $related_products = isset($_POST['related_products']) ? explode(',', $_POST['related_products']) : [];
 
     if ($id) {
-        $stmt = $pdo->prepare("UPDATE products SET name = ?, price = ?, description = ?, syllabus = ?, relevance = ? WHERE id = ?");
-        $stmt->execute([$name, $price, $description, $syllabus, $relevance, $id]);
+        $channel = $_POST['channel'] ?? null;
+        $estado = $_POST['estado'] ?? null;
+        $stmt = $pdo->prepare("UPDATE products SET name = ?, price = ?, description = ?, syllabus = ?, relevance = ?, channel = ?, estado = ? WHERE id = ?");
+        $stmt->execute([$name, $price, $description, $syllabus, $relevance, $channel, $estado, $id]);
 
         // Actualizar relaciones de productos
         $pdo->prepare("DELETE FROM product_relations WHERE product_id = ?")->execute([$id]);
@@ -56,8 +58,11 @@ if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 ->execute([$id, $related_id]);
         }
     } else {
-        $stmt = $pdo->prepare("INSERT INTO products (name, price, description, syllabus, relevance) VALUES (?, ?, ?, ?, ?)");
-        $stmt->execute([$name, $price, $description, $syllabus, $relevance]);
+        $channel = $_POST['channel'] ?? null;
+        $estado = $_POST['estado'] ?? null;
+        $stmt = $pdo->prepare("INSERT INTO products (name, price, description, syllabus, relevance, channel, estado) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$name, $price, $description, $syllabus, $relevance, $channel, $estado]);
+
         $product_id = $pdo->lastInsertId();
 
         foreach ($related_products as $related_id) {
@@ -123,6 +128,9 @@ include('header.php')
                 <th>Nombre</th>
                 <th>Precio</th>
                 <th>Descripción</th>
+                <th>Canal</th>
+                <th>Estado</th>
+
                 <th>Temario</th>
                 <th>Productos Relacionados</th>
                 <th>Acciones</th>
@@ -136,9 +144,14 @@ include('header.php')
                     <td><?= $product['price'] !== null ? $product['price'] : 'No especificado' ?></td>
                     <td>
                         <div class="text-truncate" style="max-width: 150px; cursor:pointer;" onclick="toggleExpand(this)">
-                            <?= htmlspecialchars($product['description']) ?>
+                            <?= htmlspecialchars($product['description'] ?? '', ENT_QUOTES, 'UTF-8') ?>
+
                         </div>
                     </td>
+                    <td><?= htmlspecialchars($product['channel'] ?? '', ENT_QUOTES, 'UTF-8') ?: '-' ?></td>
+                    <td><?= htmlspecialchars($product['estado'] ?? '', ENT_QUOTES, 'UTF-8') ?: '-' ?></td>
+
+
                     <td>
                         <div class="text-truncate temario-content" style="max-width: 150px; cursor:pointer;"
                             onclick="toggleExpand(this)">
@@ -151,7 +164,8 @@ include('header.php')
                             $stmt = $pdo->prepare("SELECT p.name FROM products p JOIN product_relations r ON p.id = r.related_product_id WHERE r.product_id = ?");
                             $stmt->execute([$product['id']]);
                             $related_products = $stmt->fetchAll(PDO::FETCH_COLUMN);
-                            echo htmlspecialchars(implode(", ", $related_products)) ?: 'No relacionados';
+                            echo htmlspecialchars(implode(", ", $related_products ?? []), ENT_QUOTES, 'UTF-8') ?: 'No relacionados';
+
                             ?>
                         </div>
                     </td>
@@ -196,6 +210,21 @@ include('header.php')
                             <label for="description" class="form-label">Descripción</label>
                             <textarea class="form-control" id="description" name="description" rows="3"></textarea>
                         </div>
+                        <div class="mb-3">
+                            <label for="channel" class="form-label">Canal</label>
+                            <input type="text" class="form-control" id="channel" name="channel">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="estado" class="form-label">Estado</label>
+                            <select class="form-select" id="estado" name="estado">
+                                <option value="">Selecciona un estado</option>
+                                <option value="promocion">Promoción</option>
+                                <option value="privado">Privado</option>
+                                <option value="publico">Público</option>
+                            </select>
+                        </div>
+
 
                         <div class="mb-3">
                             <label for="syllabus" class="form-label">Temario</label>
@@ -246,6 +275,9 @@ include('header.php')
                             $('#name').val(product.name);
                             $('#price').val(product.price);
                             $('#description').val(product.description);
+                            $('#channel').val(product.channel);
+                            $('#estado').val(product.estado);
+
                             $('#relevance').prop('checked', product.relevance == 1);
                             $('#productModal').modal('show');
                         }
@@ -334,6 +366,9 @@ include('header.php')
                             $('#name').val(product.name);
                             $('#price').val(product.price);
                             $('#description').val(product.description);
+                            $('#channel').val(product.channel);
+                            $('#estado').val(product.estado);
+
                             $('#syllabus').val(product.syllabus);
                             $('#relevance').prop('checked', product.relevance == 1);
 
@@ -363,7 +398,7 @@ include('header.php')
                 }
             };
         });
-        
+
 
     </script>
 
@@ -404,9 +439,10 @@ include('header.php')
 
     </script>
     </body>
-<?php
-if (isset($stmt)) unset($stmt);
-unset($pdo);
-?>
+    <?php
+    if (isset($stmt))
+        unset($stmt);
+    unset($pdo);
+    ?>
 
     </html>

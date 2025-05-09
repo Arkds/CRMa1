@@ -45,8 +45,8 @@ function asignarPuntosVenta($pdo, $venta_id, $user_id, $price, $currency, $quant
             $stmt = $pdo->prepare("INSERT INTO historial_puntos_historicos 
                                  (user_id, puntos, tipo, comentario) 
                                  VALUES (?, ?, 'venta_normal', ?)");
-            $comentario = "Venta #$venta_id - {$quantity} unid. - " . 
-                         ($currency == 'MXN' ? "$" . number_format($price, 2) . " MXN" : "S/" . number_format($price, 2));
+            $comentario = "Venta #$venta_id - {$quantity} unid. - " .
+                ($currency == 'MXN' ? "$" . number_format($price, 2) . " MXN" : "S/" . number_format($price, 2));
             $stmt->execute([$user_id, $puntos, $comentario]);
 
             // 3. Marcar venta como procesada y guardar puntos asignados
@@ -70,7 +70,7 @@ function asignarPuntosVenta($pdo, $venta_id, $user_id, $price, $currency, $quant
 $isAdmin = isset($role) && $role === 'admin';
 
 // Consultar productos disponibles
-$productsQuery = "SELECT name, price, description FROM products";
+$productsQuery = "SELECT name, price, channel, estado FROM products";
 
 $stmt = $pdo->query($productsQuery);
 
@@ -92,11 +92,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $productName = $_POST['product_name'];
     $price = $_POST['price'];
     $quantity = $_POST['quantity'];
-    $currency = $_POST['currency'] ?? 'MXN';
+    $currency = $_POST['currency'] ?? $_POST['currency_hidden'] ?? 'MXN';
+    $monedas_validas = ['MXN', 'PEN', 'USD', 'EUR', 'BRL', 'CLP', 'COL'];
+    if (!in_array($currency, $monedas_validas)) {
+        $currency = 'MXN';
+    }
+
+
+
     $saleType = $_POST['sale_type'] ?? 'messenger';
 
     // Solo obtener número si es venta por WhatsApp
-    $clientPhone = $saleType === 'whatsapp' ? ($_POST['client_phone'] ?? null) : null;
+    $clientPhone = $_POST['client_phone'] ?? null;
 
     // Observaciones siempre se envían (pueden estar vacías)
     $observations = $_POST['observations'] ?? null;
@@ -107,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$productName, $price, $quantity, $user_id, $currency, $saleType, $clientPhone, $observations]);
         $venta_id = $pdo->lastInsertId();
 
-    asignarPuntosVenta($pdo, $venta_id, $user_id, $price, $currency, $quantity);
+        asignarPuntosVenta($pdo, $venta_id, $user_id, $price, $currency, $quantity);
 
 
     } elseif ($action === 'edit' && $id) {
@@ -155,6 +162,11 @@ if (!$isAdmin) {
 
 $sales = $stmt->fetchAll();
 
+
+$ventas_agrupadas_usuario = array_values(array_filter($sales, function ($venta) use ($user_id) {
+    return $venta['user_id'] == $user_id;
+}));
+
 // Si está en modo edición, obtener datos de la venta
 $saleToEdit = null;
 if ($action === 'edit' && $id) {
@@ -167,6 +179,20 @@ $stmt = null;
 include('header.php')
 
     ?>
+<style>
+    .border-whatsapp {
+        border: 2px solid #25D366 !important;
+        /* Verde WhatsApp real */
+        box-shadow: 0 0 5px #25D36666;
+    }
+
+    .border-messenger {
+        border: 2px solid #0084FF !important;
+        /* Azul Messenger real */
+        box-shadow: 0 0 5px #0084FF66;
+    }
+</style>
+
 
 <div class="container mt-5">
     <div id="liveAlertPlaceholder"></div>
@@ -227,9 +253,9 @@ include('header.php')
     <?php endif; ?>
 
     <!-- Formulario de registro o edición de ventas -->
-    <!-- Formulario de registro o edición de ventas -->
-    <!-- Formulario de registro o edición de ventas -->
     <h2><?= $action === 'edit' ? 'Editar Venta' : 'Registrar Nueva Venta' ?></h2>
+    <div id="alertaDuplicado" class="alert alert-warning d-none" role="alert"></div>
+
     <form method="POST" class="mb-4" action="sales_crud.php?action=<?= $action ?><?= $id ? '&id=' . $id : '' ?>">
         <div class="row g-3">
             <!-- Primera fila: Campos básicos -->
@@ -237,28 +263,39 @@ include('header.php')
                 <label for="product_name" class="form-label">Producto</label>
                 <input type="text" class="form-control" id="product_name" name="product_name" list="productList"
                     value="<?= $saleToEdit['product_name'] ?? ' ' ?>" required>
+                <small id="monedaSugerida" class="text-muted mt-1 d-block"></small>
+
                 <datalist id="productList">
                     <?php foreach ($products as $product): ?>
-                        <option value="<?= htmlspecialchars($product['description'] . '|' . $product['name']) ?>"></option>
+                        <option value="<?= htmlspecialchars($product['name'] . '|' . $product['channel']) ?>"></option>
                     <?php endforeach; ?>
                 </datalist>
+                <small id="ultimasVentas" class="text-muted d-block mt-1 ms-1"></small>
 
             </div>
 
             <div class="col-md-2">
                 <label for="price" class="form-label">Precio</label>
-                <input type="number" step="0.01" class="form-control" id="price" name="price"
-                    value="<?= $saleToEdit['price'] ?? '' ?>" required>
-            </div>
+                <input type="number" step="0.01" class="form-control" id="price" name="price" list="priceList" required
+                    value="<?= $saleToEdit['price'] ?? '' ?>">
+                <ul id="priceSuggestions" class="list-group position-absolute mt-1"
+                    style="z-index: 9999; display: none; width: auto;"></ul>
 
-            <div class="col-md-2">
-                <label for="quantity" class="form-label">Cantidad</label>
-                <input type="number" class="form-control" id="quantity" name="quantity"
-                    value="<?= $saleToEdit['quantity'] ?? '1' ?>" required>
+
+
+            </div>
+            <!-- WhatsApp Fields (debajo de los switches) -->
+            <div class="col-md-3">
+                <label for="client_phone" class="form-label" id="client_phone_label">
+                    <?= ($saleToEdit['sale_type'] ?? 'messenger') === 'whatsapp' ? 'Número de WhatsApp' : 'Nombre del Cliente' ?>
+                </label>
+                <input type="text" class="form-control" id="client_phone" name="client_phone"
+                    placeholder="<?= ($saleToEdit['sale_type'] ?? 'messenger') === 'whatsapp' ? 'Ej: +51987654321' : 'Ej: Juan Pérez' ?>"
+                    value="<?= $saleToEdit['client_phone'] ?? '' ?>" required>
             </div>
 
             <!-- Columna para los switches -->
-            <div class="col-md-4">
+            <div class="col-md-2">
                 <!-- Switch para tipo de venta -->
                 <div class="form-check form-switch mb-3">
                     <input class="form-check-input" type="checkbox" id="saleTypeToggle" name="sale_type"
@@ -279,19 +316,12 @@ include('header.php')
                 </div>
             </div>
 
-            <!-- WhatsApp Fields (debajo de los switches) -->
-            <div class="col-md-12 collapse <?= ($saleToEdit['sale_type'] ?? 'messenger') === 'whatsapp' ? 'show' : '' ?>"
-                id="whatsappFields">
-                <div class="card mt-2">
-                    <div class="card-body p-3">
-                        <label for="client_phone" class="form-label">Número de WhatsApp</label>
-                        <input type="tel" class="form-control" id="client_phone" name="client_phone"
-                            placeholder="Ej: +51987654321"
-                            value="<?= ($saleToEdit['sale_type'] ?? '') === 'whatsapp' ? ($saleToEdit['client_phone'] ?? '') : '' ?>">
-                        <small class="text-muted">Incluir código de país (Ej: +51 para Perú)</small>
-                    </div>
-                </div>
+            <div class="col-md-1">
+                <label for="quantity" class="form-label">Cant.</label>
+                <input type="number" class="form-control form-control-sm" id="quantity" name="quantity"
+                    value="<?= $saleToEdit['quantity'] ?? '1' ?>" min="1">
             </div>
+
 
             <!-- Observations Fields (debajo de los switches) -->
             <div class="col-md-12 collapse <?= !empty($saleToEdit['observations']) ? 'show' : '' ?>"
@@ -398,7 +428,11 @@ include('header.php')
         </div>
 
         <input type="hidden" name="original_currency" value="<?= $saleToEdit['currency'] ?? 'MXN' ?>">
+        <input type="hidden" name="currency_hidden" id="currency_hidden">
+
     </form>
+
+    <div id="alertaValidacionMoneda" class="alert alert-warning d-none mt-3" role="alert"></div>
 
     <!-- Tabla de ventas -->
     <h2>Ventas Registradas</h2>
@@ -408,11 +442,9 @@ include('header.php')
             <tr>
                 <th>ID</th>
                 <th>Producto</th>
-                <th>Teléfono</th>
+                <th>Teléfono / Nombre</th>
                 <th>Precio</th>
                 <th>Moneda</th>
-                <th>Cantidad</th>
-                <th>Total</th>
                 <th>Puntos</th> <!-- Nueva columna -->
                 <th>Vendedor</th>
                 <th>Fecha</th>
@@ -424,11 +456,18 @@ include('header.php')
                 <tr>
                     <td><?= $sale['id'] ?></td>
                     <td><?= htmlspecialchars($sale['product_name']) ?></td>
-                    <td><?= $sale['client_phone'] ? htmlspecialchars($sale['client_phone']) : '-' ?></td>
+                    <td>
+                        <?php if ($sale['sale_type'] === 'whatsapp'): ?>
+                            <i class="bi bi-whatsapp" style="color: #25D366;"></i>
+                        <?php else: ?>
+                            <i class="bi bi-messenger" style="color: #0084FF;"></i>
+                        <?php endif; ?>
+                        <?= $sale['client_phone'] ? htmlspecialchars($sale['client_phone']) : '-' ?>
+                    </td>
+
                     <td><?= htmlspecialchars($sale['price']) ?></td>
                     <td><?= strtoupper($sale['currency']) ?></td>
-                    <td><?= htmlspecialchars($sale['quantity']) ?></td>
-                    <td><?= number_format($sale['price'] * $sale['quantity'], 2) ?></td>
+
                     <td>
                         <?php if ($sale['puntos_venta'] > 0): ?>
                             <span class="badge bg-success">+<?= $sale['puntos_venta'] ?></span>
@@ -507,22 +546,27 @@ include('header.php')
     // Función para manejar el tipo de venta
     function handleSaleType() {
         const saleTypeToggle = document.getElementById('saleTypeToggle');
-        const label = document.getElementById('saleTypeLabel');
-        const whatsappFields = document.getElementById('whatsappFields');
         const clientPhone = document.getElementById('client_phone');
-        const bsCollapse = new bootstrap.Collapse(whatsappFields, { toggle: false });
+        const clientPhoneLabel = document.getElementById('client_phone_label');
 
-        label.textContent = saleTypeToggle.checked ? 'WhatsApp' : 'Messenger';
+        // Limpiar clases anteriores
+        clientPhone.classList.remove('border-whatsapp', 'border-messenger');
 
         if (saleTypeToggle.checked) {
-            bsCollapse.show();
-            clientPhone.required = true;
+            // WhatsApp
+            clientPhoneLabel.textContent = 'Número de WhatsApp';
+            clientPhone.placeholder = 'Ej: +51987654321';
+            clientPhone.classList.add('border-whatsapp');
         } else {
-            bsCollapse.hide();
-            clientPhone.value = '';
-            clientPhone.required = false;
+            // Messenger
+            clientPhoneLabel.textContent = 'Nombre del Cliente';
+            clientPhone.placeholder = 'Ej: Juan Pérez';
+            clientPhone.classList.add('border-messenger');
         }
     }
+
+
+
 
     // Función para manejar observaciones
     function handleObservations() {
@@ -574,27 +618,387 @@ include('header.php')
         }
     });
 </script>
+
 <script>
-    const productInput = document.getElementById('product_name');
     const priceInput = document.getElementById('price');
+    const productInput = document.getElementById('product_name');
+    const priceSuggestions = document.getElementById('priceSuggestions');
     const productData = <?= json_encode($products) ?>;
 
+    let currentPriceVariants = [];
+
+    function getPriceVariants(basePrice) {
+        let variants = [basePrice];
+        if (basePrice === 100) variants.push(99.00, 99.90, 80.00);
+        else if (basePrice === 150) variants.push(149.00, 149.90, 130.00);
+        else if (basePrice === 19.90) variants.push(19.00, 20.00);
+        else if (basePrice === 9.90) variants.push(8.00, 9.00);
+        return [...new Set(variants.map(v => parseFloat(v.toFixed(2))))];
+    }
+
+    function mostrarSugerencias(precios) {
+        priceSuggestions.innerHTML = '';
+        if (!precios.length) {
+            priceSuggestions.style.display = 'none';
+            return;
+        }
+
+        precios.forEach(precio => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item list-group-item-action py-1';
+            li.textContent = precio.toFixed(2);
+            li.style.cursor = 'pointer';
+            li.onclick = () => {
+                priceInput.value = li.textContent;
+                priceSuggestions.style.display = 'none';
+            };
+            priceSuggestions.appendChild(li);
+        });
+
+        const rect = priceInput.getBoundingClientRect();
+        priceSuggestions.style.position = 'absolute';
+        priceSuggestions.style.top = `${priceInput.offsetTop + priceInput.offsetHeight}px`;
+        priceSuggestions.style.left = `${priceInput.offsetLeft}px`;
+        priceSuggestions.style.width = `${priceInput.offsetWidth}px`;
+        priceSuggestions.style.display = 'block';
+    }
+
+    // Al seleccionar un producto
     productInput.addEventListener('input', function () {
-        const selectedValue = this.value;
-        const parts = selectedValue.split('|');
-        if (parts.length === 2) {
-            const productName = parts[1].trim();
-            const product = productData.find(p => p.name === productName);
-            if (product) {
-                priceInput.value = product.price;
+        const [name, channel] = this.value.split('|').map(s => s.trim());
+        const producto = productData.find(p => p.name === name && p.channel === channel);
+
+        if (producto) {
+            priceInput.value = parseFloat(producto.price).toFixed(2);
+
+            if (producto.estado && producto.estado.toLowerCase() === 'promocion') {
+                currentPriceVariants = getPriceVariants(parseFloat(producto.price));
+                mostrarSugerencias(currentPriceVariants);
+            } else {
+                currentPriceVariants = [];
+                priceSuggestions.style.display = 'none';
             }
+        }
+    });
+
+    // Mostrar sugerencias incluso si el valor actual es parcial o no coincide
+    priceInput.addEventListener('focus', function () {
+        if (currentPriceVariants.length > 0) {
+            mostrarSugerencias(currentPriceVariants);
+        }
+    });
+
+    priceInput.addEventListener('click', function () {
+        if (currentPriceVariants.length > 0) {
+            mostrarSugerencias(currentPriceVariants);
+        }
+    });
+
+    // Ocultar sugerencias al hacer clic fuera
+    document.addEventListener('click', function (e) {
+        if (!priceInput.contains(e.target) && !priceSuggestions.contains(e.target)) {
+            priceSuggestions.style.display = 'none';
         }
     });
 </script>
 
 
+
+<script>
+    const ventasHoy = <?= json_encode($ventas_agrupadas_usuario) ?>;
+</script>
+
+<script>
+    let ventasRecientes = <?= json_encode(array_map(function ($s) {
+        return [
+            'product' => trim(strtolower(preg_replace('/\|+$/', '', $s['product_name']))),
+            'phone' => strtolower(trim(preg_replace('/[\s\-\+]/', '', $s['client_phone'])))
+        ];
+    }, $sales)); ?>;
+
+
+    function normalizarProducto(producto) {
+        return producto.trim().toLowerCase().replace(/\|+$/, '');
+    }
+
+    function normalizarTelefono(telefono) {
+        return telefono.trim().toLowerCase().replace(/[\s\-\+]/g, '');
+    }
+
+
+    function validarDuplicado() {
+        const productoInput = document.getElementById('product_name');
+        const telefonoInput = document.getElementById('client_phone');
+        const producto = normalizarProducto(productoInput.value);
+        const telefono = normalizarTelefono(telefonoInput.value);
+        const alerta = document.getElementById('alertaDuplicado');
+
+        // Solo validar si ambos campos tienen contenido
+        if (producto && telefono) {
+            const duplicado = ventasRecientes.some(v => v.product === producto && v.phone === telefono);
+
+            if (duplicado) {
+                alerta.classList.remove('d-none');
+                alerta.textContent = "⚠️ Ya existe una venta hoy con el mismo producto y número/nombre. Verifica antes de continuar.";
+            } else {
+                alerta.classList.add('d-none');
+            }
+        } else {
+            alerta.classList.add('d-none');
+        }
+    }
+
+
+
+    document.getElementById('product_name').addEventListener('input', validarDuplicado);
+    document.getElementById('client_phone').addEventListener('input', validarDuplicado);
+</script>
+
+<script>
+    function normalizarProducto(prod) {
+        return prod.trim().toLowerCase().replace(/\|+$/, '');
+    }
+
+    function normalizarTelefono(phone) {
+        return phone.replace(/[\s\-\+]/g, '');
+    }
+
+    function actualizarCoincidencias() {
+        const productoInput = document.getElementById('product_name').value;
+        const telefonoInput = document.getElementById('client_phone').value;
+        const alerta = document.getElementById('alertaCoincidencias');
+
+        const producto = normalizarProducto(productoInput);
+        const telefono = normalizarTelefono(telefonoInput);
+
+        if (!producto || !telefono) {
+            alerta.classList.add('d-none');
+            alerta.innerHTML = '';
+            return;
+        }
+
+        const coincidencias = ventasHoy.filter(v => {
+            const vProd = normalizarProducto(v.product_name);
+            const vTel = normalizarTelefono(v.client_phone || '');
+            return vProd === producto && vTel === telefono;
+        });
+
+        if (coincidencias.length > 0) {
+            const ultimos = coincidencias.slice(0, 5).map(v =>
+                `<li><strong>${new Date(v.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong> - ${v.product_name}</li>`
+            ).join('');
+
+            alerta.classList.remove('d-none');
+            alerta.innerHTML = `
+            <strong>⚠️ Hoy ingresaste ${coincidencias.length} ${coincidencias.length === 1 ? 'vez' : 'veces'} el producto</strong>
+            <br><strong>"${productoInput}" con el número "${telefonoInput}"</strong>.<br>
+            <ul class="mb-0">${ultimos}</ul>
+        `;
+        } else {
+            alerta.classList.add('d-none');
+            alerta.innerHTML = '';
+        }
+    }
+
+    document.getElementById('product_name').addEventListener('input', actualizarCoincidencias);
+    document.getElementById('client_phone').addEventListener('input', actualizarCoincidencias);
+</script>
+<script>
+    const ultimasVentasElement = document.getElementById('ultimasVentas');
+
+    function normalizarProducto(p) {
+        return (p || '').toLowerCase().trim().replace(/\|+$/, '');
+    }
+
+    function formatearTelefono(tel) {
+        return tel ? tel.replace(/\s+/g, '') : ' ';
+    }
+
+    function mostrarUltimasVentas() {
+        const input = document.getElementById('product_name').value;
+        const valorNormalizado = normalizarProducto(input);
+
+        if (!valorNormalizado) {
+            ultimasVentasElement.innerHTML = '';
+            return;
+        }
+
+        const coincidencias = ventasHoy.filter(v => normalizarProducto(v.product_name).includes(valorNormalizado));
+        if (coincidencias.length === 0) {
+            ultimasVentasElement.innerHTML = 'No hay registros previos con este producto.';
+            return;
+        }
+
+        const lista = coincidencias.slice(0, 5).map(v => {
+            const hora = new Date(v.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const tel = formatearTelefono(v.client_phone);
+            const precio = `${v.currency} ${parseFloat(v.price).toFixed(2)}`;
+            return `<li><strong>${hora}</strong> | ${v.product_name} | <span class="text-secondary">${tel}</span>  | <span class="text-success">${precio}</span></li>`;
+        }).join('');
+
+        ultimasVentasElement.innerHTML = `
+            <small>Últimas 5 ventas con este producto:</small>
+            <ul class="mb-0 small ps-3">${lista}</ul>
+        `;
+    }
+
+    document.getElementById('product_name').addEventListener('input', mostrarUltimasVentas);
+    window.addEventListener('DOMContentLoaded', mostrarUltimasVentas);
+</script>
+
+<script>
+    function sugerirMoneda() {
+        const productoInput = document.getElementById('product_name');
+        const valor = productoInput.value;
+        const sugerencia = document.getElementById('monedaSugerida');
+
+        if (!valor.includes('|')) {
+            sugerencia.textContent = '';
+            return;
+        }
+
+        const [nombre, canal] = valor.split('|').map(s => s.trim().toLowerCase());
+        const producto = productData.find(p => p.name.toLowerCase() === nombre && p.channel.toLowerCase() === canal);
+
+        if (producto) {
+            let monedaSugerida = '';
+            if (producto.price < 100) {
+                monedaSugerida = 'PEN';
+            } else {
+                monedaSugerida = 'MXN';
+            }
+
+            sugerencia.innerHTML = `<small class="text-primary">💡 Este producto parece ser en <strong>${monedaSugerida}</strong>.</small>`;
+        } else {
+            sugerencia.textContent = '';
+        }
+    }
+
+    document.getElementById('product_name').addEventListener('input', sugerirMoneda);
+
+</script>
+<script>
+    let lastClickedCurrency = null;
+
+    document.querySelectorAll("button[type='submit'][name='currency']").forEach(btn => {
+        btn.addEventListener("click", () => {
+            lastClickedCurrency = btn.value;
+        });
+    });
+
+    document.querySelector("form").addEventListener("submit", function (e) {
+        e.preventDefault();
+
+        const precio = parseFloat(document.getElementById('price').value);
+        const moneda = document.activeElement?.value;
+        const productoInput = document.getElementById('product_name').value;
+
+        const partes = productoInput.split('|');
+        if (partes.length !== 2 || isNaN(precio) || !moneda) {
+            document.getElementById('currency_hidden').value = lastClickedCurrency || moneda || 'MXN';
+            this.submit();
+            return;
+        }
+
+
+        const nombre = partes[0].trim().toLowerCase();
+        const canal = partes[1].trim().toLowerCase();
+
+        const productoCoincidente = productData.find(p =>
+            p.name.toLowerCase() === nombre &&
+            p.channel.toLowerCase() === canal
+        );
+
+        if (productoCoincidente) {
+            const precioBase = parseFloat(productoCoincidente.price);
+            let monedaSugerida = 'MXN';
+            if (precioBase < 100 && precio >= (precioBase - 5) && precio <= (precioBase + 5)) {
+                monedaSugerida = 'PEN';
+            }
+
+            // Si la moneda es incorrecta primero
+            if (moneda !== monedaSugerida) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: '¿Moneda incorrecta?',
+                    html: `Estás ingresando <strong>${moneda}</strong> pero se sugiere <strong>${monedaSugerida}</strong> según el precio <strong>${precio}</strong>.`,
+                    showCancelButton: true,
+                    confirmButtonText: 'Insertar de todas formas',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#198754',
+                    cancelButtonColor: '#d33'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        if (lastClickedCurrency) {
+                            document.getElementById('currency_hidden').value = lastClickedCurrency;
+                        }
+
+                        e.target.submit();
+                    }
+                });
+                return;
+            }
+
+            // Luego validamos el rango de precios
+            let tolerancia = { min: precioBase, max: precioBase };
+            if (moneda === 'MXN') {
+                tolerancia.min = precioBase - 50;
+                tolerancia.max = precioBase + 80;
+            } else if (moneda === 'PEN') {
+                tolerancia.min = precioBase - 10;
+                tolerancia.max = precioBase + 10;
+            }
+
+            const dentroDelRango = precio >= tolerancia.min && precio <= tolerancia.max;
+
+            if (!dentroDelRango) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Precio fuera de rango esperado',
+                    html: `El producto "<strong>${productoCoincidente.name}</strong>" con canal "<strong>${productoCoincidente.channel}</strong>" tiene un precio base de <strong>${precioBase.toFixed(2)}</strong>.<br>
+Estás ingresando <strong>${precio.toFixed(2)} ${moneda}</strong>, lo cual está fuera del rango permitido:<br>
+<strong>${tolerancia.min.toFixed(2)} a ${tolerancia.max.toFixed(2)}</strong>.`,
+                    showCancelButton: true,
+                    confirmButtonText: 'Insertar de todas formas',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#198754',
+                    cancelButtonColor: '#d33'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        if (lastClickedCurrency) {
+                            document.getElementById('currency_hidden').value = lastClickedCurrency || moneda || 'MXN';
+                        }
+
+                        e.target.submit();
+                    }
+                });
+            } else {
+                if (lastClickedCurrency) {
+                    document.getElementById('currency_hidden').value = lastClickedCurrency || moneda || 'MXN';
+                }
+
+
+
+                e.target.submit(); // Todo correcto
+            }
+
+        } else {
+            // Producto no encontrado
+            if (lastClickedCurrency) {
+                document.getElementById('currency_hidden').value = lastClickedCurrency || moneda || 'MXN';
+            }
+
+            e.target.submit();
+
+        }
+    });
+
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 </body>
-<?php $pdo = null;?>
+<?php $pdo = null; ?>
 <?php
 unset($stmt);
 ?>

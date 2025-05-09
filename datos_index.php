@@ -29,7 +29,7 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 // Obtener productos relevantes
-$products = $pdo->query("SELECT relevance, name, price, description FROM products ORDER BY relevance DESC, name ASC")->fetchAll();
+$products = $pdo->query("SELECT relevance, name, price, description, channel FROM products ORDER BY relevance DESC, name ASC")->fetchAll();
 
 
 // Configuración de rangos de fechas
