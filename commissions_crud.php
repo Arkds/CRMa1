@@ -165,22 +165,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $description = preg_replace('/- Comisión compartida con: .*/', '', $description);
         $description = trim($description);
     }
-    if ($commission_id) {
-        $description = $_POST['description'] ?? null;
-    
-        $query = $isAdmin
-            ? "UPDATE commissions SET product_name=?, price=?, channel=?, operation_number=?, description=?, client_email=?, voucher_datetime=? WHERE id=?"
-            : "UPDATE commissions SET product_name=?, price=?, channel=?, operation_number=?, description=?, client_email=?, voucher_datetime=? WHERE id=? AND user_id=?";
-    
-        $params = $isAdmin
-            ? [$product_name, $price, $channel, $operation_number, $description, $client_email, $voucher_datetime, $commission_id]
-            : [$product_name, $price, $channel, $operation_number, $description, $client_email, $voucher_datetime, $commission_id, $user_id];
+if ($commission_id) {
+    $description = $_POST['description'] ?? '';
 
+    // 👇💡 CORRECCIÓN: incluir la lógica de comisión compartida aquí dentro
+    $is_shared = isset($_POST['is_shared']) && $_POST['is_shared'] === 'on';
+    $shared_user_id = $_POST['shared_user'] ?? null;
 
-        $stmt = $pdo->prepare($query);
-        $stmt->execute($params);
-        setcookie('success_message', "¡Comisión actualizada correctamente!", time() + 5, "/");
+    if ($is_shared && $shared_user_id) {
+        $stmt = $pdo->prepare("SELECT username FROM users WHERE id = ?");
+        $stmt->execute([$shared_user_id]);
+        $shared_user = $stmt->fetch();
+
+        $shared_text = "- Comisión compartida con: " . $shared_user['username'];
+
+        if (strpos($description, $shared_text) === false) {
+            $description = trim($description . "\n" . $shared_text);
+        }
     } else {
+        $description = preg_replace('/- Comisión compartida con: .*/', '', $description);
+        $description = trim($description);
+    }
+
+    $query = $isAdmin
+        ? "UPDATE commissions SET product_name=?, price=?, channel=?, operation_number=?, description=?, client_email=?, voucher_datetime=? WHERE id=?"
+        : "UPDATE commissions SET product_name=?, price=?, channel=?, operation_number=?, description=?, client_email=?, voucher_datetime=? WHERE id=? AND user_id=?";
+
+    $params = $isAdmin
+        ? [$product_name, $price, $channel, $operation_number, $description, $client_email, $voucher_datetime, $commission_id]
+        : [$product_name, $price, $channel, $operation_number, $description, $client_email, $voucher_datetime, $commission_id, $user_id];
+
+    $stmt = $pdo->prepare($query);
+    $stmt->execute($params);
+    setcookie('success_message', "¡Comisión actualizada correctamente!", time() + 5, "/");
+}
+ else {
         // Insertar nueva comisión
         $stmt = $pdo->prepare("INSERT INTO commissions (product_name, price, channel, operation_number, description, user_id, client_email, voucher_datetime) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([$product_name, $price, $channel, $operation_number, $description, $user_id, $client_email, $voucher_datetime]);
@@ -272,8 +291,10 @@ include('header.php')
     <h1 class="text-center">Gestión de Comisiones</h1>
     <button class="btn btn-secondary mb-3" onclick="window.location.replace('sales_crud.php');">Volver</button>
 
-    <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#commissionModal">Nueva
-        Comisión</button>
+    <button id="newCommissionBtn" class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#commissionModal">
+    Nueva Comisión
+</button>
+
 
     <?php if (!empty($drive_folder)): ?>
         <button class="btn btn-info mb-3" onclick="window.open('<?= htmlspecialchars($drive_folder) ?>', '_blank');">
@@ -380,20 +401,22 @@ include('header.php')
                         $comprobantes_json = htmlspecialchars(json_encode($comprobantes), ENT_QUOTES);
                         ?>
 
-                        <button class="btn btn-warning btn-sm " data-bs-toggle="modal" data-bs-target="#commissionModal"
-                            onclick='editCommission(
-        "<?= $commission['id'] ?>",
-        "<?= htmlspecialchars($commission['product_name'], ENT_QUOTES) ?>",
-        "<?= $commission['price'] ?>",
-        "<?= htmlspecialchars($commission['channel'], ENT_QUOTES) ?>",
-        "<?= htmlspecialchars($commission['operation_number'], ENT_QUOTES) ?>",
-        "<?= isset($commission['description']) ? htmlspecialchars($commission['description'], ENT_QUOTES) : '' ?>",
-        <?= json_encode($comprobantes, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>,
-        "<?= isset($commission['client_email']) ? htmlspecialchars($commission['client_email'], ENT_QUOTES) : '' ?>",
-        "<?= isset($commission['voucher_datetime']) ? htmlspecialchars($commission['voucher_datetime'], ENT_QUOTES) : '' ?>"
-    )'>
-                            Editar
-                        </button>
+                        <button class="btn btn-warning btn-sm edit-btn"
+    data-id="<?= $commission['id'] ?>"
+    data-product="<?= htmlspecialchars($commission['product_name'], ENT_QUOTES) ?>"
+    data-price="<?= $commission['price'] ?>"
+    data-channel="<?= htmlspecialchars($commission['channel'], ENT_QUOTES) ?>"
+    data-operation="<?= htmlspecialchars($commission['operation_number'], ENT_QUOTES) ?>"
+    data-description="<?= htmlspecialchars($commission['description'], ENT_QUOTES) ?>"
+    data-links='<?= json_encode($comprobantes, JSON_HEX_APOS | JSON_HEX_QUOT) ?>'
+    data-email="<?= htmlspecialchars($commission['client_email'], ENT_QUOTES) ?>"
+    data-date="<?= htmlspecialchars($commission['voucher_datetime'], ENT_QUOTES) ?>"
+    data-bs-toggle="modal"
+    data-bs-target="#commissionModal">
+    Editar
+</button>
+
+
 
 
                         <?php if ($isAdmin): ?>
@@ -534,6 +557,8 @@ include('header.php')
 </div>
 <script>
     function editCommission(id, productName, price, channel, operationNumber, description, links, clientEmail, voucherDatetime) {
+        document.querySelector('#commissionModal form').reset();
+
         document.getElementById("commission_id").value = id;
         document.getElementById("product_name").value = productName;
         document.getElementById("price").value = price;
@@ -541,6 +566,10 @@ include('header.php')
         document.getElementById("operation_number").value = operationNumber;
         document.getElementById("description").value = description && description !== "null" ? description : "";
         document.getElementById("client_email").value = clientEmail || "";
+         document.getElementById("sharedCommission").checked = false;
+    document.getElementById("sharedCommissionContainer").style.display = "none";
+    const sharedText = document.querySelector('.shared-text');
+    if (sharedText) sharedText.remove();
 
         // Formatear la fecha para el input date (solo fecha)
         if (voucherDatetime) {
@@ -820,4 +849,51 @@ include('header.php')
             }
         }
     });
+    
+    
+    document.querySelectorAll('.edit-btn').forEach(button => {
+    button.addEventListener('click', function () {
+        const id = this.dataset.id;
+        const product = this.dataset.product;
+        const price = this.dataset.price;
+        const channel = this.dataset.channel;
+        const operation = this.dataset.operation;
+        const description = this.dataset.description;
+        const links = JSON.parse(this.dataset.links || '[]');
+        const email = this.dataset.email;
+        const date = this.dataset.date;
+
+        editCommission(id, product, price, channel, operation, description, links, email, date);
+    });
+});
+
+
+document.getElementById('newCommissionBtn').addEventListener('click', function () {
+    const form = document.querySelector('#commissionModal form');
+    form.reset();
+
+    // Limpiar comprobantes
+    const container = document.getElementById("comprobantesContainer");
+    container.innerHTML = '';
+    const input = document.createElement("input");
+    input.type = "url";
+    input.name = "links[]";
+    input.classList.add("form-control", "mb-2");
+    input.placeholder = "Pega el enlace del comprobante";
+    container.appendChild(input);
+
+    // Limpiar campos adicionales
+    document.getElementById('sharedCommission').checked = false;
+    document.getElementById('sharedCommissionContainer').style.display = 'none';
+
+    // Borrar texto compartido si existe
+    const sharedText = document.querySelector('.shared-text');
+    if (sharedText) sharedText.remove();
+
+    // Resetear manualmente valores si quedaron persistentes
+    document.getElementById('commission_id').value = '';
+    document.getElementById('description').value = '';
+    document.getElementById('voucher_datetime').value = '';
+});
+
 </script>

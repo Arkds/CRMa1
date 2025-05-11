@@ -282,6 +282,7 @@ include('header.php')
                     style="z-index: 9999; display: none; width: auto;"></ul>
 
 
+                <datalist id="priceList"></datalist>
 
             </div>
             <!-- WhatsApp Fields (debajo de los switches) -->
@@ -994,6 +995,7 @@ Estás ingresando <strong>${precio.toFixed(2)} ${moneda}</strong>, lo cual está
     });
 
 </script>
+
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
