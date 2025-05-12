@@ -100,13 +100,7 @@ include('header.php');
         <h1 class="text-center">Bienvenido(a), <?= htmlspecialchars($username) ?> 👋</h1>
         <hr>
     </div>
-    <?php if ($role === 'admin'): ?>
 
-    <?php else: ?>
-
-
-
-    <?php endif; ?>
 
     <!-- Tabla de productos relevantes -->
     <div class="container mt-4">
@@ -120,7 +114,7 @@ include('header.php');
                             <th>Nombre</th>
                             <th>Precio</th>
                             <th>Descripción</th>
-                            <th>Canal</th> <!-- 🔹 Nueva columna -->
+                            <th>Canal</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -139,6 +133,32 @@ include('header.php');
 
             </section>
         </div>
+
+        <div class="text-center mb-3">
+            <br>
+            <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#graphsContainer"
+                aria-expanded="false" aria-controls="graphsContainer" id="toggleGraphsBtn">
+                Mostrar Gráficos
+            </button>
+        </div>
+
+        <div class="collapse" id="graphsContainer">
+            <?php include('graphs.php'); ?>
+        </div>
+
+        <?php if ($role === 'admin'): ?>
+            <div class="text-center mb-3">
+                <br>
+                <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#panelsigContainer"
+                    aria-expanded="false" aria-controls="panelsig" id="toggleGraphsBtn">
+                    Mostrar Panel
+                </button>
+            </div>
+
+            <div class="collapse" id="panelsigContainer">
+                <?php include('panel_sig.php'); ?>
+            </div>
+        <?php endif; ?>
 
 
         <!-- TABLA DE RECOMPENSAS ALCANZABLES -->
@@ -443,17 +463,7 @@ include('header.php');
         <?php endif; ?>
 
         <!-- Botón para mostrar/ocultar gráficos -->
-        <div class="text-center mb-3">
-            <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#graphsContainer"
-                aria-expanded="false" aria-controls="graphsContainer" id="toggleGraphsBtn">
-                Mostrar Gráficos
-            </button>
-        </div>
 
-        <!-- Contenedor colapsable para los gráficos -->
-        <div class="collapse" id="graphsContainer">
-            <?php include('graphs.php'); ?>
-        </div>
     </div>
 </div>
 

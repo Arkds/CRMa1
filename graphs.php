@@ -1,4 +1,3 @@
-
 <?php
 require 'db.php';
 
@@ -31,8 +30,11 @@ $salesByDay = $pdo->query("
     SELECT 
         DATE(created_at) AS fecha,
         SUM(quantity) AS total_cantidad,
+        SUM(CASE WHEN currency = 'MXN' THEN quantity ELSE 0 END) AS cantidad_mxn,
+        SUM(CASE WHEN currency = 'PEN' THEN quantity ELSE 0 END) AS cantidad_pen,
         SUM(CASE WHEN currency = 'MXN' THEN price * quantity ELSE 0 END) AS total_mxn,
         SUM(CASE WHEN currency = 'PEN' THEN price * quantity ELSE 0 END) AS total_pen
+
     FROM sales
     GROUP BY fecha
     ORDER BY fecha ASC
@@ -118,7 +120,7 @@ $salesByUserPerDay = $pdo->query("
 
 $salesByUserPerDayJson = json_encode($salesByUserPerDay);
 
-    
+
 
 // Convertir los datos a JSON para usarlos en el gráfico
 $productsDataJson = json_encode($productsData);
@@ -143,15 +145,13 @@ $pdo = null;
     <?php if ($isAdmin): ?>
         <div class="col-md-6">
             <section class="card p-3">
-                <h2 class="text-center">Cantidad de Productos Vendidos por Día</h2>
-                <canvas id="salesChart"></canvas>
-                <div class="mt-3 text-center">
-                    <button id="prevBtn" class="btn btn-primary">← 30 días anteriores</button>
-                    <button id="nextBtn" class="btn btn-primary" disabled>30 días siguientes →</button>
-                </div>
+                <h2>Productos Más Vendidos</h2>
+                <canvas id="productsChart"></canvas>
             </section>
         </div>
+
     <?php endif; ?>
+
 
     <?php if ($isAdmin): ?>
         <div class="col-md-6">
@@ -164,117 +164,213 @@ $pdo = null;
 
     <br>
     <?php if ($isAdmin): ?>
-        <section class="card p-3">
-            <h2>Productos Más Vendidos</h2>
-            <canvas id="productsChart"></canvas>
-        </section>
-    <?php endif; ?>
-    
-<?php if ($isAdmin): ?>
-    <div class="col-md-12">
-    <section class="card p-3">
-        <h2 class="text-center">Ventas por Vendedor - Cantidad y Monto</h2>
-        <button id="switchModoVentas" class="btn btn-secondary mb-2">Cambiar entre Cantidad / Monto</button>
-        <canvas id="userSalesChart"></canvas>
-        <div class="text-center mt-3">
-            <button id="prevUserSales" class="btn btn-primary">← 7 días anteriores</button>
-            <button id="nextUserSales" class="btn btn-primary" disabled>7 días siguientes →</button>
+        <div class="compact">
+            <section class="card p-3">
+                <h2 class="text-center">Cantidad/Montos por Día</h2>
+                <canvas id="salesChart"></canvas>
+                <div class="mt-3 text-center">
+                    <button id="prevBtn" class="btn btn-primary">← 30 días anteriores</button>
+                    <button id="nextBtn" class="btn btn-primary" disabled>30 días siguientes →</button>
+                </div>
+            </section>
         </div>
-    </section>
-</div>
+    <?php endif; ?>
 
-<?php endif; ?>
+    <?php if ($isAdmin): ?>
+        <div class="col-md-12">
+            <section class="card p-3">
+                <h2 class="text-center">Ventas por Vendedor - Cantidad y Monto</h2>
+                <button id="switchModoVentas" class="btn btn-secondary mb-2">Cambiar entre Cantidad / Monto</button>
+                <canvas id="userSalesChart"></canvas>
+                <div class="text-center mt-3">
+                    <button id="prevUserSales" class="btn btn-primary">← 7 días anteriores</button>
+                    <button id="nextUserSales" class="btn btn-primary" disabled>7 días siguientes →</button>
+                </div>
+            </section>
+        </div>
+
+    <?php endif; ?>
 
 
 </div>
 
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-    const salesData = <?= $salesDataJson ?>;
-    const labels = salesData.map(item => item.fecha);
-    const cantidad = salesData.map(item => item.total_cantidad);
-    const mxn = salesData.map(item => item.total_mxn);
-    const pen = salesData.map(item => item.total_pen);
+    document.addEventListener("DOMContentLoaded", function () {
+        const salesData = <?= $salesDataJson ?>;
+        const labels = salesData.map(item => item.fecha);
+        const cantidad = salesData.map(item => item.total_cantidad);
+        const mxn = salesData.map(item => item.total_mxn);
+        const pen = salesData.map(item => item.total_pen);
+        const cantidadMXN = salesData.map(item => item.cantidad_mxn);
+        const cantidadPEN = salesData.map(item => item.cantidad_pen);
 
-    let startIndex = Math.max(0, labels.length - 30);
-    let endIndex = labels.length;
 
-    const ctx = document.getElementById('salesChart').getContext('2d');
-    let salesChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels.slice(startIndex, endIndex),
-            datasets: [
-                {
-                    label: 'Cantidad Vendida',
-                    data: cantidad.slice(startIndex, endIndex),
-                    borderColor: 'rgba(54, 162, 235, 1)',
-                    backgroundColor: 'rgba(54, 162, 235, 0.1)',
-                    fill: true,
-                    tension: 0.4
-                },
-                {
-                    label: 'Total MXN',
-                    data: mxn.slice(startIndex, endIndex),
-                    borderColor: 'rgba(255, 99, 132, 1)',
-                    backgroundColor: 'rgba(255, 99, 132, 0.3)',
-                    fill: false,
-                    yAxisID: 'y1'
-                },
-                {
-                    label: 'Total PEN',
-                    data: pen.slice(startIndex, endIndex),
-                    borderColor: 'rgba(255, 206, 86, 1)',
-                    backgroundColor: 'rgba(255, 206, 86, 0.3)',
-                    fill: false,
-                    yAxisID: 'y1'
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: { display: true, position: 'top' }
-            },
-            scales: {
-                x: { title: { display: true, text: 'Fecha' } },
-                y: { title: { display: true, text: 'Cantidad Vendida' }, beginAtZero: true },
-                y1: {
-                    position: 'right',
-                    title: { display: true, text: 'Total en MXN / PEN' },
-                    beginAtZero: true,
-                    grid: { drawOnChartArea: false }
-                }
+        let startIndex = Math.max(0, labels.length - 30);
+        let endIndex = labels.length;
+
+
+        const ctx = document.getElementById('salesChart').getContext('2d');
+
+        const diasSemana = new Intl.DateTimeFormat('es-PE', { weekday: 'short' });
+        const backgroundWeekendPlugin = {
+            id: 'backgroundWeekend',
+            beforeDraw(chart) {
+                const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
+
+                chart.data.labels.forEach((label, i) => {
+                    const dia = label.split(' ')[0]; // Ej: "SÁB"
+                    if (dia === 'SÁB' || dia === 'DOM') {
+                        const xPos = x.getPixelForTick(i);
+
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.strokeStyle = dia === 'SÁB' ? 'rgba(255,193,7,0.5)' : 'rgba(255,82,82,0.5)';
+                        ctx.lineWidth = 1;
+                        ctx.setLineDash([4, 2]);
+                        ctx.moveTo(xPos, top);
+                        ctx.lineTo(xPos, bottom);
+                        ctx.stroke();
+
+                        // Etiqueta arriba
+                        ctx.fillStyle = ctx.strokeStyle;
+                        ctx.font = "bold 10px sans-serif";
+                        ctx.textAlign = "center";
+                        ctx.fillText(dia, xPos, top - 5);
+
+                        ctx.restore();
+                    }
+                });
             }
-        }
-    });
+        };
 
-    function updateChart() {
-        salesChart.data.labels = labels.slice(startIndex, endIndex);
-        salesChart.data.datasets[0].data = cantidad.slice(startIndex, endIndex);
-        salesChart.data.datasets[1].data = mxn.slice(startIndex, endIndex);
-        salesChart.data.datasets[2].data = pen.slice(startIndex, endIndex);
-        salesChart.update();
-        document.getElementById('nextBtn').disabled = (endIndex >= labels.length);
-        document.getElementById('prevBtn').disabled = (startIndex <= 0);
-    }
 
-    document.getElementById('prevBtn').addEventListener('click', function () {
-        if (startIndex > 0) {
-            startIndex = Math.max(0, startIndex - 30);
-            endIndex = Math.max(30, endIndex - 30);
-            updateChart();
-        }
-    });
+        const etiquetasConDia = labels.map(fecha => {
+            const [year, month, day] = fecha.split('-');
+            const fechaSinTZ = new Date(`${year}-${month}-${day}T12:00:00`);
+            const dia = diasSemana.format(fechaSinTZ);
+            return `${dia.toUpperCase()} ${fecha}`;
+        });
 
-    document.getElementById('nextBtn').addEventListener('click', function () {
-        if (endIndex < labels.length) {
-            startIndex = Math.min(labels.length - 30, startIndex + 30);
-            endIndex = Math.min(labels.length, endIndex + 30);
-            updateChart();
+
+        let salesChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: etiquetasConDia.slice(startIndex, endIndex),
+
+                datasets: [
+                    {
+                        label: 'Cantidad Vendida',
+                        data: cantidad.slice(startIndex, endIndex),
+                        borderColor: '#0000ff',
+                        backgroundColor: 'transparent',
+                        fill: true,
+                        tension: 0.3
+                    },
+                    {
+                        label: 'Total MXN',
+                        data: mxn.slice(startIndex, endIndex),
+                        borderColor: '#69F0AE',
+                        backgroundColor: 'rgba(255, 99, 132, 0.3)',
+                        fill: false,
+                        borderDash: [3.2],
+                        yAxisID: 'y1',
+                        tension: 0.3
+                    },
+                    {
+                        label: 'Total PEN',
+                        data: pen.slice(startIndex, endIndex),
+                        borderColor: '#29B6F6',
+                        backgroundColor: 'rgba(255, 206, 86, 0.3)',
+                        fill: false,
+                        borderDash: [3.2],
+                        yAxisID: 'y1',
+                        tension: 0.3
+                    },
+                    {
+                        label: 'Cantidad MXN',
+                        data: cantidadMXN.slice(startIndex, endIndex),
+                        borderColor: '#198754',
+                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                        fill: false,
+                        borderWidth: 1,
+                        tension: 0.3
+                    },
+                    {
+                        label: 'Cantidad PEN',
+                        data: cantidadPEN.slice(startIndex, endIndex),
+                        borderColor: '#0D47A1',
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        fill: false,
+                        borderWidth: 1,
+                        tension: 0.3
+                    },
+
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: true, position: 'top' },
+                    backgroundWeekend: true // ← activador personalizado
+                },
+                scales: {
+                    x: { title: { display: true, text: 'Fecha' } },
+                    y: { title: { display: true, text: 'Cantidad Vendida' }, beginAtZero: true },
+                    y1: {
+                        type: 'linear',
+                        position: 'right',
+                        title: { display: true, text: 'Total en MXN / PEN' },
+                        beginAtZero: true,
+                        grid: { drawOnChartArea: false }
+                    }
+                }
+            },
+            plugins: [backgroundWeekendPlugin]
+
+
+
+        });
+
+        function updateChart() {
+            const etiquetasConDia = labels.map(fecha => {
+                const dia = diasSemana.format(new Date(fecha));
+                return `${dia.toUpperCase()} ${fecha}`;
+            });
+
+
+            salesChart.data.labels = etiquetasConDia.slice(startIndex, endIndex);
+            salesChart.data.datasets[0].data = cantidad.slice(startIndex, endIndex);
+            salesChart.data.datasets[1].data = mxn.slice(startIndex, endIndex);
+            salesChart.data.datasets[2].data = pen.slice(startIndex, endIndex);
+            salesChart.data.datasets[3].data = cantidadMXN.slice(startIndex, endIndex);
+            salesChart.data.datasets[4].data = cantidadPEN.slice(startIndex, endIndex);
+
+            salesChart.update();
+
+            document.getElementById('nextBtn').disabled = endIndex >= labels.length;
+            document.getElementById('prevBtn').disabled = startIndex <= 0;
         }
+
+
+
+
+
+        document.getElementById('prevBtn').addEventListener('click', function () {
+            if (startIndex > 0) {
+                startIndex = Math.max(0, startIndex - 30);
+                endIndex = Math.max(30, endIndex - 30);
+                updateChart();
+            }
+        });
+
+        document.getElementById('nextBtn').addEventListener('click', function () {
+            if (endIndex < labels.length) {
+                startIndex = Math.min(labels.length - 30, startIndex + 30);
+                endIndex = Math.min(labels.length, endIndex + 30);
+                updateChart();
+            }
+        });
     });
-});
 
 </script>
 <script>
@@ -510,129 +606,126 @@ document.addEventListener("DOMContentLoaded", function () {
 </script>
 
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-    const rawData = <?= $salesByUserPerDayJson ?>;
-    const grouped = {}, usuarios = new Set();
+    document.addEventListener("DOMContentLoaded", function () {
+        const rawData = <?= $salesByUserPerDayJson ?>;
+        const grouped = {}, usuarios = new Set();
 
-    rawData.forEach(item => {
-        if (!grouped[item.fecha]) grouped[item.fecha] = {};
-        grouped[item.fecha][item.username] = {
-            cantidad: parseInt(item.total_cantidad),
-            mxn: parseFloat(item.monto_mxn),
-            pen: parseFloat(item.monto_pen)
-        };
-        usuarios.add(item.username);
-    });
-
-    const fechas = Object.keys(grouped).sort();
-    const usuariosArray = [...usuarios];
-    let start = Math.max(0, fechas.length - 7);
-    let end = fechas.length;
-
-    const colorCantidad = ['#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f', '#edc948', '#b07aa1'];
-    const colorMXN = ['#9c755f', '#bab0ab', '#ff9da7', '#8cd17d', '#b6992d', '#499894', '#d37295'];
-    const colorPEN = ['#fabfd2', '#b5d9ff', '#c9b2f5', '#ffbf80', '#a0cbe8', '#d4a6c8', '#86bcb6'];
-
-    const datasets = [];
-    usuariosArray.forEach((user, i) => {
-        datasets.push({
-            label: `${user} - Cantidad`,
-            data: [],
-            backgroundColor: colorCantidad[i % colorCantidad.length],
-            stack: 'cantidad'
+        rawData.forEach(item => {
+            if (!grouped[item.fecha]) grouped[item.fecha] = {};
+            grouped[item.fecha][item.username] = {
+                cantidad: parseInt(item.total_cantidad),
+                mxn: parseFloat(item.monto_mxn),
+                pen: parseFloat(item.monto_pen)
+            };
+            usuarios.add(item.username);
         });
-        datasets.push({
-            label: `${user} - MXN`,
-            data: [],
-            backgroundColor: colorMXN[i % colorMXN.length],
-            stack: 'mxn'
-        });
-        datasets.push({
-            label: `${user} - PEN`,
-            data: [],
-            backgroundColor: colorPEN[i % colorPEN.length],
-            stack: 'pen'
-        });
-    });
 
-    const ctx = document.getElementById('userSalesChart').getContext('2d');
-    const chart = new Chart(ctx, {
-        type: 'bar',
-        data: { labels: [], datasets },
-        options: {
-            responsive: true,
-            plugins: {
-                title: { display: true, text: 'Ventas por Vendedor (Cantidad, MXN y PEN)' },
-                legend: { position: 'top' },
-                tooltip: {
-                    mode: 'nearest',
-                    intersect: true,
-                    callbacks: {
-                        label: function (tooltipItem) {
-                            return `${tooltipItem.dataset.label}: ${tooltipItem.raw}`;
+        const fechas = Object.keys(grouped).sort();
+        const usuariosArray = [...usuarios];
+        let start = Math.max(0, fechas.length - 7);
+        let end = fechas.length;
+
+        const colorCantidad = ['#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f', '#edc948', '#b07aa1'];
+        const colorMXN = ['#9c755f', '#bab0ab', '#ff9da7', '#8cd17d', '#b6992d', '#499894', '#d37295'];
+        const colorPEN = ['#fabfd2', '#b5d9ff', '#c9b2f5', '#ffbf80', '#a0cbe8', '#d4a6c8', '#86bcb6'];
+
+        const datasets = [];
+        usuariosArray.forEach((user, i) => {
+            datasets.push({
+                label: `${user} - Cantidad`,
+                data: [],
+                backgroundColor: colorCantidad[i % colorCantidad.length],
+                stack: 'cantidad'
+            });
+            datasets.push({
+                label: `${user} - MXN`,
+                data: [],
+                backgroundColor: colorMXN[i % colorMXN.length],
+                stack: 'mxn'
+            });
+            datasets.push({
+                label: `${user} - PEN`,
+                data: [],
+                backgroundColor: colorPEN[i % colorPEN.length],
+                stack: 'pen'
+            });
+        });
+
+        const ctx = document.getElementById('userSalesChart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'bar',
+            data: { labels: [], datasets },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: { display: true, text: 'Ventas por Vendedor (Cantidad, MXN y PEN)' },
+                    legend: { position: 'top' },
+                    tooltip: {
+                        mode: 'nearest',
+                        intersect: true,
+                        callbacks: {
+                            label: function (tooltipItem) {
+                                return `${tooltipItem.dataset.label}: ${tooltipItem.raw}`;
+                            }
                         }
                     }
+                },
+                scales: {
+                    x: { stacked: true, title: { display: true, text: 'Fecha' } },
+                    y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Cantidad / Monto' } }
                 }
-            },
-            scales: {
-                x: { stacked: true, title: { display: true, text: 'Fecha' } },
-                y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Cantidad / Monto' } }
             }
-        }
-    });
-
-    function updateChart() {
-        const fechasVisibles = fechas.slice(start, end);
-        chart.data.labels = fechasVisibles;
-
-        usuariosArray.forEach((user, i) => {
-            chart.data.datasets[i * 3].data = fechasVisibles.map(f => grouped[f]?.[user]?.cantidad || 0);
-            chart.data.datasets[i * 3 + 1].data = fechasVisibles.map(f => grouped[f]?.[user]?.mxn || 0);
-            chart.data.datasets[i * 3 + 2].data = fechasVisibles.map(f => grouped[f]?.[user]?.pen || 0);
         });
 
-        chart.update();
-        document.getElementById('prevUserSales').disabled = start <= 0;
-        document.getElementById('nextUserSales').disabled = end >= fechas.length;
-    }
+        function updateChart() {
+            const fechasVisibles = fechas.slice(start, end);
+            chart.data.labels = fechasVisibles;
 
-    document.getElementById('prevUserSales').addEventListener('click', () => {
-        if (start > 0) {
-            start = Math.max(0, start - 7);
-            end = start + 7;
-            updateChart();
+            usuariosArray.forEach((user, i) => {
+                chart.data.datasets[i * 3].data = fechasVisibles.map(f => grouped[f]?.[user]?.cantidad || 0);
+                chart.data.datasets[i * 3 + 1].data = fechasVisibles.map(f => grouped[f]?.[user]?.mxn || 0);
+                chart.data.datasets[i * 3 + 2].data = fechasVisibles.map(f => grouped[f]?.[user]?.pen || 0);
+            });
+
+            chart.update();
+            document.getElementById('prevUserSales').disabled = start <= 0;
+            document.getElementById('nextUserSales').disabled = end >= fechas.length;
         }
-    });
 
-    document.getElementById('nextUserSales').addEventListener('click', () => {
-        if (end < fechas.length) {
-            start = Math.min(fechas.length - 7, start + 7);
-            end = Math.min(fechas.length, end + 7);
-            updateChart();
-        }
-    });
+        document.getElementById('prevUserSales').addEventListener('click', () => {
+            if (start > 0) {
+                start = Math.max(0, start - 7);
+                end = start + 7;
+                updateChart();
+            }
+        });
 
-    // Toggle entre cantidad y monto
-    let modo = 'cantidad';
-    document.getElementById('switchModoVentas').addEventListener('click', () => {
-        modo = (modo === 'cantidad') ? 'monto' : 'cantidad';
+        document.getElementById('nextUserSales').addEventListener('click', () => {
+            if (end < fechas.length) {
+                start = Math.min(fechas.length - 7, start + 7);
+                end = Math.min(fechas.length, end + 7);
+                updateChart();
+            }
+        });
+
+        // Toggle entre cantidad y monto
+        let modo = 'cantidad';
+        document.getElementById('switchModoVentas').addEventListener('click', () => {
+            modo = (modo === 'cantidad') ? 'monto' : 'cantidad';
+            chart.data.datasets.forEach(ds => {
+                ds.hidden = modo === 'cantidad'
+                    ? !ds.label.includes('Cantidad')
+                    : !(ds.label.includes('MXN') || ds.label.includes('PEN'));
+            });
+            chart.update();
+        });
+
+        // Mostrar solo cantidades al inicio
         chart.data.datasets.forEach(ds => {
-            ds.hidden = modo === 'cantidad'
-                ? !ds.label.includes('Cantidad')
-                : !(ds.label.includes('MXN') || ds.label.includes('PEN'));
+            ds.hidden = !ds.label.includes('Cantidad');
         });
-        chart.update();
-    });
 
-    // Mostrar solo cantidades al inicio
-    chart.data.datasets.forEach(ds => {
-        ds.hidden = !ds.label.includes('Cantidad');
+        updateChart();
     });
-
-    updateChart();
-});
 
 </script>
-
-
-
