@@ -100,7 +100,9 @@ include('header.php');
         <h1 class="text-center">Bienvenido(a), <?= htmlspecialchars($username) ?> 👋</h1>
         <hr>
     </div>
-
+    <div class="asistencia" id="asistencia">
+        <?php include('asistencia.php'); ?>
+    </div>
 
     <!-- Tabla de productos relevantes -->
     <div class="container mt-4">

@@ -30,6 +30,7 @@ $turnos_disponibles = [
     'mañana_parcial' => 'Mañana Parcial (8am-2pm)',
     'tarde' => 'Tarde (2pm-8pm)',
     'noche' => 'Noche (5pm-11pm)',
+    'noche_parcial' => 'Noche Parcial (8pm-11pm)',
     'mixto' => 'Mixto (Horarios variables)'
 ];
 // Acción actual
