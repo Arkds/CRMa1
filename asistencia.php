@@ -1,4 +1,53 @@
 <?php
+
+if ((new DateTime('now', new DateTimeZone('America/Lima')))->format('N') == 1) {
+    $semana_anterior = (new DateTime('last week'))->format("o-W");
+
+    try {
+        $pdo->beginTransaction();
+
+        $verificar = $pdo->prepare("
+            SELECT COUNT(*) FROM historial_puntos_historicos
+            WHERE user_id = :user_id AND tipo = 'sin_errores_semana' AND semana_year = :semana
+        ");
+        $verificar->execute([
+            ':user_id' => $user_id,
+            ':semana' => $semana_anterior
+        ]);
+
+        if ($verificar->fetchColumn() == 0) {
+            $stmt = $pdo->prepare("
+                SELECT COUNT(*) AS total_dias,
+                       SUM(tipo_entrada = 'normal') AS dias_puntuales
+                FROM asistencia
+                WHERE user_id = :user_id
+                  AND WEEK(fecha, 1) = WEEK(DATE_SUB(CURDATE(), INTERVAL 1 WEEK), 1)
+                  AND YEAR(fecha) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 WEEK))
+                  AND DAYOFWEEK(fecha) BETWEEN 2 AND 7
+            ");
+            $stmt->execute([':user_id' => $user_id]);
+            $res = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($res['total_dias'] > 0 && $res['total_dias'] == $res['dias_puntuales']) {
+                $insert = $pdo->prepare("
+                    INSERT INTO historial_puntos_historicos (user_id, puntos, tipo, comentario, semana_year, origen)
+                    VALUES (:user_id, 100, 'sin_errores_semana', 'Puntualidad completa en la semana', :semana, 'asistencia')
+                ");
+                $insert->execute([
+                    ':user_id' => $user_id,
+                    ':semana' => $semana_anterior
+                ]);
+                $puntos_asignados_esta_visita = true;
+            }
+        }
+
+        $pdo->commit();
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        error_log("Error al asignar puntos semanales: " . $e->getMessage());
+    }
+}
+
 $fechaHoy = (new DateTime('now', new DateTimeZone('America/Lima')))->format('Y-m-d');
 
 $stmt = $pdo->prepare("SELECT * FROM asistencia WHERE user_id = :user_id AND fecha = :fecha");
@@ -13,38 +62,6 @@ define('UMBRAL_EXTRA_MINUTOS', 1);
 $ahora = new DateTime('now', new DateTimeZone('America/Lima'));
 $horaActual = $ahora->format('H:i:s');
 
-function detectarHorarioEntrada($horaActual, $horarios)
-{
-    $actual = new DateTime($horaActual);
-    $mejorOpcion = null;
-    $menorDiferencia = PHP_INT_MAX;
-
-    foreach ($horarios as $hora) {
-        $esperada = new DateTime($hora);
-        $diff = $esperada->diff($actual);
-        $minutos = ($diff->h * 60) + $diff->i;
-
-        if ($actual >= $esperada && $minutos <= MARGEN_TARDANZA_MINUTOS) {
-            if ($minutos < $menorDiferencia) {
-                $mejorOpcion = $esperada;
-                $menorDiferencia = $minutos;
-            }
-        }
-    }
-
-    return $mejorOpcion;
-}
-function detectarHorarioSalida($horaActual, $horarios)
-{
-    $actual = new DateTime($horaActual);
-    foreach ($horarios as $hora) {
-        $esperada = new DateTime($hora);
-        if ($actual >= $esperada) {
-            return $esperada;
-        }
-    }
-    return null;
-}
 
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -167,16 +184,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':user_id' => $user_id
                 ]);
                 $aplicado_a_sancion = 1;
-            } else {
-                $puntos = floor($minutosExtra / 10);
-                if ($puntos > 0) {
-                    $stmt = $pdo->prepare("INSERT INTO historial_puntos_historicos (user_id, puntos, tipo, origen, created_at)
-                VALUES (:user_id, :puntos, 'extra', 'recuperacion', NOW())");
-                    $stmt->execute([
-                        ':user_id' => $user_id,
-                        ':puntos' => $puntos
-                    ]);
-                }
             }
 
             // Registrar recuperación en la tabla correspondiente
@@ -188,7 +195,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ':fecha' => $fechaHoy,
                 ':minutos' => $minutosAplicables,
                 ':aplicado' => $aplicado_a_sancion,
-                ':puntos' => $puntos
+                ':puntos' => 0
+
             ]);
         }
 
@@ -293,3 +301,11 @@ if (!$asistencia) {
     setInterval(actualizarReloj, 1000);
     actualizarReloj();
 </script>
+
+<?php
+// Liberar recursos y cerrar conexión (buenas prácticas)
+$stmt = null;
+$verificar = null;
+$insert = null;
+$pdo = null;
+?>

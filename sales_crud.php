@@ -1,6 +1,5 @@
 <?php
 
-
 ob_start();
 
 if (isset($_COOKIE['user_session'])) {
@@ -35,21 +34,18 @@ function asignarPuntosVenta($pdo, $venta_id, $user_id, $price, $currency, $quant
         $pdo->beginTransaction();
 
         try {
-            $puntos = 50 * intval($quantity); // 50 puntos por unidad
+            $puntos = 35 * intval($quantity);
 
-            // 1. Asignar puntos al usuario
             $stmt = $pdo->prepare("UPDATE users SET puntos_historicos = puntos_historicos + ? WHERE id = ?");
             $stmt->execute([$puntos, $user_id]);
 
-            // 2. Registrar en el historial de puntos
             $stmt = $pdo->prepare("INSERT INTO historial_puntos_historicos 
-                                 (user_id, puntos, tipo, comentario) 
-                                 VALUES (?, ?, 'venta_normal', ?)");
+                                    (user_id, puntos, tipo, comentario) 
+                                    VALUES (?, ?, 'venta_normal', ?)");
             $comentario = "Venta #$venta_id - {$quantity} unid. - " .
                 ($currency == 'MXN' ? "$" . number_format($price, 2) . " MXN" : "S/" . number_format($price, 2));
             $stmt->execute([$user_id, $puntos, $comentario]);
 
-            // 3. Marcar venta como procesada y guardar puntos asignados
             $stmt = $pdo->prepare("UPDATE sales SET puntos_asignados = TRUE, puntos_venta = ? WHERE id = ?");
             $stmt->execute([$puntos, $venta_id]);
 
@@ -98,8 +94,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $currency = 'MXN';
     }
 
-
-
     $saleType = $_POST['sale_type'] ?? 'messenger';
 
     // Solo obtener número si es venta por WhatsApp
@@ -110,12 +104,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'create') {
         $stmt = $pdo->prepare("INSERT INTO sales (product_name, price, quantity, user_id, currency, sale_type, client_phone, observations) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([$productName, $price, $quantity, $user_id, $currency, $saleType, $clientPhone, $observations]);
         $venta_id = $pdo->lastInsertId();
 
         asignarPuntosVenta($pdo, $venta_id, $user_id, $price, $currency, $quantity);
-
 
     } elseif ($action === 'edit' && $id) {
         // Obtener datos actuales de la venta
@@ -124,14 +117,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $venta_actual = $stmt->fetch();
 
         $stmt = $pdo->prepare("UPDATE sales SET 
-                            product_name = ?, 
-                            price = ?, 
-                            quantity = ?, 
-                            currency = ?,
-                            sale_type = ?,
-                            client_phone = ?,
-                            observations = ?
-                            WHERE id = ?");
+                                product_name = ?, 
+                                price = ?, 
+                                quantity = ?, 
+                                currency = ?,
+                                sale_type = ?,
+                                client_phone = ?,
+                                observations = ?
+                                WHERE id = ?");
         $stmt->execute([$productName, $price, $quantity, $currency, $saleType, $clientPhone, $observations, $id]);
 
         // Si cambió el precio o la moneda, y aún no se han asignado puntos
@@ -140,32 +133,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ($venta_actual['price'] != $price || $venta_actual['currency'] != $currency)
         ) {
 
-
-
         }
     }
     setcookie('success_message', "¡Venta " . ($action === 'edit' ? 'actualizada' : 'registrada') . " en $currency!", time() + 5, "/");
     header('Location: sales_crud.php');
     exit;
 }
-if (!$isAdmin) {
-    // Obtener solo las ventas del usuario en el día actual
-    $salesQuery = "SELECT * FROM sales WHERE user_id = ? AND DATE(created_at) = CURDATE() ORDER BY created_at DESC";
-    $stmt = $pdo->prepare($salesQuery);
-    $stmt->execute([$user_id]);
+// Obtener todas las ventas del día actual (para todos, incluyendo username)
+if ($isAdmin) {
+    $stmt = $pdo->prepare("SELECT s.*, u.username FROM sales s JOIN users u ON s.user_id = u.id WHERE DATE(s.created_at) = CURDATE() ORDER BY s.created_at DESC");
+    $stmt->execute();
 } else {
-    // Obtener todas las ventas del día actual para los administradores
-    $salesQuery = "SELECT s.*, u.username FROM sales s JOIN users u ON s.user_id = u.id WHERE DATE(s.created_at) = CURDATE() ORDER BY s.created_at DESC";
-    $stmt = $pdo->query($salesQuery);
+    $stmt = $pdo->prepare("SELECT s.*, u.username FROM sales s JOIN users u ON s.user_id = u.id WHERE DATE(s.created_at) = CURDATE() AND s.user_id = ? ORDER BY s.created_at DESC");
+    $stmt->execute([$user_id]);
 }
-
-
 $sales = $stmt->fetchAll();
 
+// Obtener ventas de la semana actual (lunes a domingo)
+// Obtener ventas de los últimos 7 días (desde hoy hacia atrás)
+$inicio_rango = date('Y-m-d H:i:s', strtotime('-7 days'));
+$fin_rango = date('Y-m-d H:i:s');
 
+$stmt = $pdo->prepare("
+    SELECT s.*, u.username 
+    FROM sales s 
+    JOIN users u ON s.user_id = u.id 
+    WHERE s.created_at BETWEEN :inicio AND :fin
+");
+$stmt->execute([
+    ':inicio' => $inicio_rango,
+    ':fin' => $fin_rango
+]);
+$sales_all_today = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+
+
+// Agrupar solo las ventas del usuario para mostrar en tabla
 $ventas_agrupadas_usuario = array_values(array_filter($sales, function ($venta) use ($user_id) {
     return $venta['user_id'] == $user_id;
 }));
+
+
 
 // Si está en modo edición, obtener datos de la venta
 $saleToEdit = null;
@@ -193,7 +201,6 @@ include('header.php')
     }
 </style>
 
-
 <div class="container mt-5">
     <div id="liveAlertPlaceholder"></div>
     <!--<button type="button" class="btn btn-outline-dark float-end" id="liveAlertBtn">Ayuda</button>-->
@@ -218,19 +225,19 @@ include('header.php')
             alertTrigger.addEventListener('click', () => {
                 // Lista numerada de instrucciones
                 const message = `
-                <ol>
-                    <li>Registra ventas ingresando producto, precio y cantidad (por defecto 1).</li>
-                    <li>Escoge si la venta se dio en messenger o wn whatsapp con el switch, por defecto estará en messenger.</li>
-                    <li>Tambien puedes escoger si la venta tiene alguna observación.</li>
-                    <li>Para guardar en soles debes dar en el boton correspondiente (Guardar PEN).</li>
-                    <li>Para guardar en pesos mexicanos deber dar dar en el boton correspondiente (Guardar MXN).</li>
-                    <li>Si la venta fue hecha en otra moneda haz click en "Mas opciones de moneda" y seleciona la moneda correspondiente</li>
-                    <li>Para editar una venta solo dale al boton "editar", ten cuidado y revisa la información antes de guardar</li>
-                    <li>Solo puededes ver/editar las ventas del día.</li>
-                    <li>Utiliza la barra de búsqueda para encontrar ventas específicas rápidamente.</li>
-                    
-                </ol>
-            `;
+                    <ol>
+                        <li>Registra ventas ingresando producto, precio y cantidad (por defecto 1).</li>
+                        <li>Escoge si la venta se dio en messenger o wn whatsapp con el switch, por defecto estará en messenger.</li>
+                        <li>Tambien puedes escoger si la venta tiene alguna observación.</li>
+                        <li>Para guardar en soles debes dar en el boton correspondiente (Guardar PEN).</li>
+                        <li>Para guardar en pesos mexicanos deber dar dar en el boton correspondiente (Guardar MXN).</li>
+                        <li>Si la venta fue hecha en otra moneda haz click en "Mas opciones de moneda" y seleciona la moneda correspondiente</li>
+                        <li>Para editar una venta solo dale al boton "editar", ten cuidado y revisa la información antes de guardar</li>
+                        <li>Solo puededes ver/editar las ventas del día.</li>
+                        <li>Utiliza la barra de búsqueda para encontrar ventas específicas rápidamente.</li>
+                        
+                    </ol>
+                `;
                 appendAlert(message, 'success');
             })
         }
@@ -239,9 +246,6 @@ include('header.php')
     <!--<button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>-->
     <button class="btn btn-outline-primary mb-3"
         onclick="window.location.replace('commissions_crud.php');">Comisiones</button>
-
-
-
 
     <!-- Mostrar mensaje de éxito si existe -->
     <?php if (isset($_COOKIE['success_message'])): ?>
@@ -706,7 +710,21 @@ include('header.php')
 
 
 <script>
-    const ventasHoy = <?= json_encode($ventas_agrupadas_usuario) ?>;
+    const ventasHoy = <?= json_encode(array_map(function ($s) {
+        return [
+            'product_name' => $s['product_name'],
+            'client_phone' => $s['client_phone'],
+            'created_at' => $s['created_at'],
+            'user_id' => $s['user_id'],
+            'username' => $s['username'] ?? '',
+            'price' => $s['price'],
+            'currency' => $s['currency'],
+        ];
+    }, $sales_all_today)) ?>;
+
+
+    const currentUserId = <?= $user_id ?>;
+
 </script>
 
 <script>
@@ -749,10 +767,103 @@ include('header.php')
         }
     }
 
+    function validarRegistroPorOtroVendedor() {
+        const productoInput = document.getElementById('product_name');
+        const telefonoInput = document.getElementById('client_phone');
+        const observacionesInput = document.getElementById('observations');
+        const showObsToggle = document.getElementById('showObservationsToggle');
+        const alerta = document.getElementById('alertaDuplicado');
+        const submitButtons = document.querySelectorAll("button[type='submit'][name='currency']");
+
+        const producto = normalizarProducto(productoInput.value);
+        const telefono = normalizarTelefono(telefonoInput.value);
+
+        if (!producto || !telefono) {
+            alerta.classList.add('d-none');
+            alerta.textContent = '';
+            submitButtons.forEach(btn => btn.disabled = false);
+            return;
+        }
+
+        const coincidencia = ventasHoy.find(v => {
+            const vProd = normalizarProducto(v.product_name);
+            const vTel = normalizarTelefono(v.client_phone || '');
+            return vProd === producto && vTel === telefono && parseInt(v.user_id) !== parseInt(currentUserId);
+        });
+
+        if (coincidencia) {
+            const fechaCompleta = new Date(coincidencia.created_at).toLocaleString('es-PE', {
+                weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            });
+
+            alerta.classList.remove('d-none');
+            alerta.innerHTML = `
+            ⚠️ <strong>Otro vendedor</strong> (<b>${coincidencia.username}</b>) ya registró esta venta el 
+            <strong>${fechaCompleta}</strong>.<br><br>
+            Si es venta especial, <strong>agrega "_ESP" al nombre del producto antes del canal</strong> 
+            (Ej: <code>nombre_ESP|canal</code>) y <strong>escribe una observación</strong>.<br>
+            <button id="btnForzarEspecial" class="btn btn-sm btn-outline-danger mt-2">Hazlo por mi</button>
+        `;
+
+            submitButtons.forEach(btn => btn.disabled = true);
+
+            function verificarCondicionesEspeciales() {
+                const nombreProducto = productoInput.value.trim();
+                const tiene_ESP = nombreProducto.includes('_ESP|');
+                const obs = observacionesInput.value.trim();
+                const obsValida = obs.length >= 5;
+                if (tiene_ESP && obsValida) {
+                    alerta.classList.add('d-none');
+                    submitButtons.forEach(btn => btn.disabled = false);
+                } else {
+                    alerta.classList.remove('d-none');
+                    submitButtons.forEach(btn => btn.disabled = true);
+                }
+            }
+
+            productoInput.addEventListener('input', verificarCondicionesEspeciales);
+            observacionesInput.addEventListener('input', verificarCondicionesEspeciales);
+
+            // Botón para automatizar
+            setTimeout(() => {
+                const btn = document.getElementById('btnForzarEspecial');
+                if (btn) {
+                    btn.addEventListener('click', () => {
+                        const valor = productoInput.value.trim();
+                        if (!valor.includes('_ESP|')) {
+                            productoInput.value = valor.replace(/\|/, '_ESP|');
+                        }
+
+                        // Activar observaciones y mostrar campo
+                        showObsToggle.checked = true;
+                        handleObservations(); // usa tu función existente
+                        observacionesInput.focus();
+
+                        alerta.classList.remove('d-none');
+                        alerta.innerHTML += `<br><small class="text-success">✅ Se aplicó el sufijo "_ESP" y se activaron observaciones.</small>`;
+
+                        verificarCondicionesEspeciales();
+                    });
+                }
+            }, 100); // esperar a que DOM actualice
+        } else {
+            alerta.classList.add('d-none');
+            alerta.textContent = '';
+            submitButtons.forEach(btn => btn.disabled = false);
+        }
+    }
+
+
 
 
     document.getElementById('product_name').addEventListener('input', validarDuplicado);
     document.getElementById('client_phone').addEventListener('input', validarDuplicado);
+    document.getElementById('product_name').addEventListener('input', validarRegistroPorOtroVendedor);
+    document.getElementById('client_phone').addEventListener('input', validarRegistroPorOtroVendedor);
+
+
+
 </script>
 
 <script>
@@ -791,10 +902,10 @@ include('header.php')
 
             alerta.classList.remove('d-none');
             alerta.innerHTML = `
-            <strong>⚠️ Hoy ingresaste ${coincidencias.length} ${coincidencias.length === 1 ? 'vez' : 'veces'} el producto</strong>
-            <br><strong>"${productoInput}" con el número "${telefonoInput}"</strong>.<br>
-            <ul class="mb-0">${ultimos}</ul>
-        `;
+                <strong>⚠️ Hoy ingresaste ${coincidencias.length} ${coincidencias.length === 1 ? 'vez' : 'veces'} el producto</strong>
+                <br><strong>"${productoInput}" con el número "${telefonoInput}"</strong>.<br>
+                <ul class="mb-0">${ultimos}</ul>
+            `;
         } else {
             alerta.classList.add('d-none');
             alerta.innerHTML = '';
@@ -838,9 +949,9 @@ include('header.php')
         }).join('');
 
         ultimasVentasElement.innerHTML = `
-            <small>Últimas 5 ventas con este producto:</small>
-            <ul class="mb-0 small ps-3">${lista}</ul>
-        `;
+                <small>Últimas 5 ventas con este producto:</small>
+                <ul class="mb-0 small ps-3">${lista}</ul>
+            `;
     }
 
     document.getElementById('product_name').addEventListener('input', mostrarUltimasVentas);
@@ -957,8 +1068,8 @@ include('header.php')
                     icon: 'warning',
                     title: 'Precio fuera de rango esperado',
                     html: `El producto "<strong>${productoCoincidente.name}</strong>" con canal "<strong>${productoCoincidente.channel}</strong>" tiene un precio base de <strong>${precioBase.toFixed(2)}</strong>.<br>
-Estás ingresando <strong>${precio.toFixed(2)} ${moneda}</strong>, lo cual está fuera del rango permitido:<br>
-<strong>${tolerancia.min.toFixed(2)} a ${tolerancia.max.toFixed(2)}</strong>.`,
+    Estás ingresando <strong>${precio.toFixed(2)} ${moneda}</strong>, lo cual está fuera del rango permitido:<br>
+    <strong>${tolerancia.min.toFixed(2)} a ${tolerancia.max.toFixed(2)}</strong>.`,
                     showCancelButton: true,
                     confirmButtonText: 'Insertar de todas formas',
                     cancelButtonText: 'Cancelar',

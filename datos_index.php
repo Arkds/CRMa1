@@ -159,7 +159,7 @@ function calcularPuntosPorEquipo($pdo, $puntos_individuales, $user_constants, $r
     $equipos = [
         'mañana' => [
             'miembros' => [
-                'Sheyla' => ['08:00', '14:00'],
+                'Sheyla' => ['08:00', '13:00'],
                 'Frank' => ['08:00', '14:00']
             ],
             'dias' => ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
@@ -238,12 +238,12 @@ function calcularPuntosPorEquipo($pdo, $puntos_individuales, $user_constants, $r
                     $datos_grafico[$venta['fecha']] = ($datos_grafico[$venta['fecha']] ?? 0) + $venta['ventas_validas'];
                 }
             }
-            
+
 
             // Calcular puntos (180 puntos por venta válida)
             // Recalcular puntos por venta válida (hazla = 210, otros = 180)
             $puntos = 0;
-            
+
             $sql_detalles = "
                 SELECT s.product_name, s.quantity
                 FROM sales s
@@ -256,7 +256,7 @@ function calcularPuntosPorEquipo($pdo, $puntos_individuales, $user_constants, $r
                 AND DAYNAME(s.created_at) IN ('" . implode("','", $equipo['dias']) . "')
                 AND TIME(s.created_at) BETWEEN :hora_inicio AND :hora_fin
             ";
-            
+
             $stmt_detalles = $pdo->prepare($sql_detalles);
             $stmt_detalles->execute([
                 'user_id' => $user_id,
@@ -265,9 +265,9 @@ function calcularPuntosPorEquipo($pdo, $puntos_individuales, $user_constants, $r
                 'hora_inicio' => $horario[0] . ':00',
                 'hora_fin' => $horario[1] . ':00'
             ]);
-            
+
             $ventas_detalle = $stmt_detalles->fetchAll();
-            
+
             $total_ventas_validas = 0;
             foreach ($ventas_detalle as $venta) {
                 $canal = explode('|', $venta['product_name'])[0];
@@ -277,7 +277,7 @@ function calcularPuntosPorEquipo($pdo, $puntos_individuales, $user_constants, $r
             }
 
 
-           
+
             $ventas_equipo[$miembro] = [
                 'ventas' => $total_ventas_validas,
                 'puntos' => $puntos,
@@ -311,7 +311,7 @@ function calcularPuntosPorEquipo($pdo, $puntos_individuales, $user_constants, $r
 
         foreach ($recompensas_grupales as $recompensa) {
             // Multiplicar por 4 para ajustar de semanal a mensual (aproximadamente)
-            $puntos_requeridos_mensual = $recompensa['puntos_requeridos'] ;
+            $puntos_requeridos_mensual = $recompensa['puntos_requeridos'];
 
             if ($equipo['puntos'] >= $puntos_requeridos_mensual) {
                 $equipo['recompensas_ganadas'][] = array_merge($recompensa, ['puntos_requeridos' => $puntos_requeridos_mensual]);
@@ -391,15 +391,16 @@ $tabla_ventas_normales = '
 <div class="card mt-4">
     <div class="card-header bg-success text-white">
         <small class="d-block">Puntos Finales = (Ventas × Puntos Base) × Constante (ajustada por dedicación)</small>
-        <h3 class="mb-0">Puntos por Ventas Fuera de Promoción</h3>
+        <h3 class="mb-0">Puntos por Ventas Normales</h3>
+
     </div>
     <div class="card-body">
         <table class="table table-striped">
             <thead>
                 <tr>
                     <th>Vendedor</th>
-                    <th>Ventas MXN (≥149)</th>
-                    <th>Ventas PEN (≥29.8)</th>
+                    <th>Ventas MXN</th>
+                    <th>Ventas PEN</th>
                     <th>Total Ventas</th>
                     <th>Puntos Base</th>
                     <th>Constante</th>
@@ -438,13 +439,7 @@ $tabla_ventas_normales .= '
 </div>
 
         </div>
-        <div class="alert alert-info mt-3">
-            <strong>Rangos de puntos:</strong>
-            <ul>
-                <li>10-19 ventas: 2,000 puntos</li>
-                <li>20+ ventas: 4,500 puntos</li>
-            </ul>
-        </div>
+        
     </div>
 </div>';
 
@@ -664,7 +659,7 @@ $recompensas_grupales_html = '
 
 foreach ($puntos_equipos as $nombre => $equipo) {
     $max_puntos = 35000; // Puntos máximos para la barra de progreso
-    
+
     $recompensas_grupales_html .= '
         <div class="mb-4">
             <h4>Equipo ' . ucfirst($nombre) . '</h4>';
@@ -716,7 +711,7 @@ foreach ($puntos_equipos as $nombre => $equipo) {
                         ' . number_format($equipo['puntos']) . ' / ' . number_format($max_puntos) . ' pts
                     </div>
                 </div>';
-    
+
     // Añadir marcas para cada recompensa
     foreach ($recompensas_grupales as $recompensa) {
         $posicion = ($recompensa['puntos_requeridos'] / $max_puntos) * 100;
@@ -730,7 +725,7 @@ foreach ($puntos_equipos as $nombre => $equipo) {
                     </div>
                 </div>';
     }
-    
+
     $recompensas_grupales_html .= '
             </div>
         </div>';
@@ -795,7 +790,7 @@ if ($role !== 'admin') {
 
     if ($equipo_usuario) {
         $max_puntos = 35000; // Puntos máximos para la barra de progreso
-        
+
         $recompensas_equipo .= '
             <h4>Equipo ' . ucfirst($nombre_equipo) . '</h4>
             <p>Puntos totales: <strong>' . number_format($equipo_usuario['puntos']) . '</strong> (Desde el primero de este mes)</p>';
@@ -848,7 +843,7 @@ if ($role !== 'admin') {
                         ' . number_format($equipo_usuario['puntos']) . ' / ' . number_format($max_puntos) . ' pts
                     </div>
                 </div>';
-        
+
         // Añadir marcas para cada recompensa
         foreach ($recompensas_grupales as $recompensa) {
             $posicion = ($recompensa['puntos_requeridos'] / $max_puntos) * 100;
@@ -862,7 +857,7 @@ if ($role !== 'admin') {
                     </div>
                 </div>';
         }
-        
+
         $recompensas_equipo .= '
             </div>';
     } else {

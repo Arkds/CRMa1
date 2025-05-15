@@ -2,16 +2,17 @@
 // puntos_personales.php
 
 // Función para obtener el último lunes a las 00:00:00
-function getLastMonday() {
+function getLastMonday()
+{
     $today = new DateTime();
     $today->setTime(0, 0, 0);
-    $dayOfWeek = (int)$today->format('N'); // 1 (lunes) - 7 (domingo)
-    
+    $dayOfWeek = (int) $today->format('N'); // 1 (lunes) - 7 (domingo)
+
     // Si hoy no es lunes, retroceder al lunes anterior
     if ($dayOfWeek > 1) {
-        $today->modify('-'.($dayOfWeek - 1).' days');
+        $today->modify('-' . ($dayOfWeek - 1) . ' days');
     }
-    
+
     return $today->format('Y-m-d H:i:s');
 }
 
@@ -67,13 +68,14 @@ foreach ($ventas_comision as $vc) {
 // Consulta para ventas normales (solo desde el lunes)
 $stmt_ventas_normales = $pdo->prepare("
     SELECT 
-        u.username,
-        SUM(CASE WHEN s.currency = 'MXN' AND s.price >= 150 THEN s.quantity ELSE 0 END) AS ventas_mxn,
-        SUM(CASE WHEN s.currency = 'PEN' AND s.price >= 29.9 THEN s.quantity ELSE 0 END) AS ventas_pen
-    FROM sales s
-    JOIN users u ON s.user_id = u.id
-    WHERE s.created_at BETWEEN :inicio AND :fin
-    GROUP BY u.username
+    u.username,
+    SUM(CASE WHEN s.currency = 'MXN' THEN s.quantity ELSE 0 END) AS ventas_mxn,
+    SUM(CASE WHEN s.currency = 'PEN' THEN s.quantity ELSE 0 END) AS ventas_pen
+FROM sales s
+JOIN users u ON s.user_id = u.id
+WHERE s.created_at BETWEEN :inicio AND :fin
+GROUP BY u.username
+
 ");
 $stmt_ventas_normales->execute([
     'inicio' => $inicio_semana,
@@ -81,24 +83,18 @@ $stmt_ventas_normales->execute([
 ]);
 $ventas_normales = $stmt_ventas_normales->fetchAll();
 
-// Resto del código sigue igual...
 foreach ($ventas_normales as $vn) {
     $total_ventas = $vn['ventas_mxn'] + $vn['ventas_pen'];
     $constante = $user_constants[$vn['username']] ?? 1;
 
-    // Nueva lógica: obtener las ventas individuales para calcular por producto
     $stmt = $pdo->prepare("
-        SELECT s.product_name, s.price, s.currency
-        FROM sales s
-        JOIN users u ON s.user_id = u.id
-        WHERE u.username = :username
-        AND s.created_at BETWEEN :inicio AND :fin
-        AND (
-            (s.currency = 'MXN' AND s.price >= 150)
-            OR
-            (s.currency = 'PEN' AND s.price >= 29.9)
-        )
-    ");
+    SELECT s.product_name, s.price, s.currency
+    FROM sales s
+    JOIN users u ON s.user_id = u.id
+    WHERE u.username = :username
+    AND s.created_at BETWEEN :inicio AND :fin
+");
+
     $stmt->execute([
         'username' => $vn['username'],
         'inicio' => $inicio_semana,
@@ -108,10 +104,9 @@ foreach ($ventas_normales as $vn) {
 
     $puntos_base = 0;
     foreach ($ventas_validas as $venta) {
-        $canal = explode('|', $venta['product_name'])[0];
-        $puntos_por_venta = (strtolower(trim($canal)) === 'hazla') ? 210 : 180;
-        $puntos_base += $puntos_por_venta;
+        $puntos_base += 15; 
     }
+
 
     $puntos_finales = round($puntos_base * $constante);
 
