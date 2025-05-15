@@ -143,11 +143,23 @@ $recompensas_historicas = [
     1600000 => "Tablet",
     2800000 => "TV - laptop básica ",
     4000000 => "¡Viaje doble pagado! "
-    
+
 ];
 
 // Procesar acciones del admin
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['actualizar_estado_reclamo']) && isset($_POST['reclamo_id'])) {
+        $reclamo_id = (int) $_POST['reclamo_id'];
+        $nuevo_estado = isset($_POST['estado_pagado']) ? 1 : 0;
+
+        $stmt = $pdo->prepare("UPDATE recompensas_historicas_reclamadas_usuarios SET pagada = ? WHERE id = ?");
+        $stmt->execute([$nuevo_estado, $reclamo_id]);
+
+        $_SESSION['mensaje'] = "Estado de recompensa actualizado.";
+        header("Location: iniciar_programa_puntos.php");
+        exit;
+    }
+
     if (isset($_POST['aprobar_solicitud']) || isset($_POST['rechazar_solicitud'])) {
         $solicitud_id = $_POST['solicitud_id'];
         $stmt = $pdo->prepare("SELECT * FROM solicitudes_puntos WHERE id = ?");
@@ -256,6 +268,7 @@ $stmt = $pdo->prepare("SELECT s.*, u.username as vendedor
                       ORDER BY s.fecha_solicitud DESC");
 $stmt->execute();
 $solicitudes_pendientes = $stmt->fetchAll();
+$username = $user_data['username'];
 
 include('header.php');
 ?>
@@ -351,6 +364,9 @@ include('header.php');
             <div class="card-body">
                 <?php foreach ($vendedores as $vendedor): ?>
                     <?php
+                    if ($vendedor['puntos_historicos'] == 0)
+                        continue; // 👈 Saltar vendedores sin puntos
+                
                     $max_puntos = 4000000; // Puntos de la máxima recompensa
                     $porcentaje = min(100, ($vendedor['puntos_historicos'] / $max_puntos) * 100);
                     ?>
@@ -386,6 +402,7 @@ include('header.php');
                         </div>
 
                         <!-- Recompensas alcanzadas -->
+
                         <div class="mt-2">
                             <?php
                             $recompensas_alcanzadas = array_filter(
@@ -405,153 +422,107 @@ include('header.php');
                                 <span class="text-muted">Aún no alcanza recompensas</span>
                             <?php endif; ?>
                         </div>
+                        <?php
+                        if ($vendedor['puntos_historicos'] > 0):
+                            // Obtener recompensas reclamadas por el vendedor
+                            $stmt = $pdo->prepare("SELECT recompensa, puntos_usados, pagada, fecha_reclamo 
+                           FROM recompensas_historicas_reclamadas_usuarios 
+                           WHERE user_id = ? ORDER BY fecha_reclamo DESC");
+                            $stmt->execute([$vendedor['id']]);
+                            $reclamos = $stmt->fetchAll();
+
+                            if (!empty($reclamos)):
+                                ?>
+                                <div class="mt-3">
+                                    <h6>🎁 Recompensas Reclamadas</h6>
+                                    <ul class="list-group">
+                                        <?php foreach ($reclamos as $r): ?>
+                                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <?= htmlspecialchars($r['recompensa']) ?><br>
+                                                    <small
+                                                        class="text-muted"><?= date('d/m/Y H:i', strtotime($r['fecha_reclamo'])) ?></small>
+                                                </div>
+                                                <?php if ($r['pagada']): ?>
+                                                    <span class="badge bg-success">Pagada</span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-warning text-dark">Pendiente</span>
+                                                <?php endif; ?>
+                                            </li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                </div>
+                                <?php
+                            endif;
+                        endif;
+                        ?>
+
                     </div>
                 <?php endforeach; ?>
             </div>
         </div>
+        <?php
+        $stmt = $pdo->prepare("SELECT r.id, r.recompensa, r.puntos_usados, r.pagada, r.fecha_reclamo, u.username 
+                       FROM recompensas_historicas_reclamadas_usuarios r
+                       JOIN users u ON r.user_id = u.id
+                       ORDER BY r.fecha_reclamo DESC");
+        $stmt->execute();
+        $recompensas_reclamadas = $stmt->fetchAll();
 
-        <!-- Panel de administración -->
-        <div class="card mt-4">
-            <div class="card-header bg-warning">
-                <h3>Panel de Administración</h3>
-            </div>
-            <div class="card-body">
-                <form method="POST" enctype="multipart/form-data">
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label class="form-label">Vendedor</label>
-                                <select name="vendedor_id" class="form-select" required>
-                                    <?php foreach ($vendedores as $v): ?>
-                                        <option value="<?= $v['id'] ?>"><?= htmlspecialchars($v['username']) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label class="form-label">Tipo de Puntos</label>
-                                <select name="tipo" class="form-select" required>
-                                    <option value="sin_errores_semana">Semana sin errores (+100 pts)</option>
-                                    <option value="error_registro">Error en registro (-150 pts)</option>
-                                    <option value="falta_sin_aviso">Falta sin aviso (-300 pts)</option>
-                                    <option value="engano_inventar">Engaño/Inventar venta (-1000 pts)</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label class="form-label">Evidencia (opcional)</label>
-                                <input type="file" name="evidencia" class="form-control">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Comentario</label>
-                        <textarea name="comentario" class="form-control" rows="2" required></textarea>
-                    </div>
-
-                    <button type="submit" name="agregar_puntos" class="btn btn-primary">
-                        Registrar Puntos
-                    </button>
-                </form>
-            </div>
-        </div>
-
-        <!-- Solicitudes pendientes -->
-        <div class="card mt-4">
-            <div class="card-header bg-warning">
-                <h3>Solicitudes Pendientes de Revisión</h3>
-                <small>Total: <?= count($solicitudes_pendientes) ?></small>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Fecha</th>
-                                <th>Vendedor</th>
-                                <th>Tipo</th>
-                                <th>Evidencia</th>
-                                <th>Comentario</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($solicitudes_pendientes as $solicitud): ?>
+        if (!empty($recompensas_reclamadas)):
+            ?>
+            <div class="card mt-5">
+                <div class="card-header bg-secondary text-white">
+                    <h4>Recompensas Reclamadas (Gestión de Pago)</h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table id="tabla_recompensas" class="table table-striped table-bordered table-sm">
+                            <thead class="table-dark">
                                 <tr>
-                                    <td><?= date('d/m/Y H:i', strtotime($solicitud['fecha_solicitud'])) ?></td>
-                                    <td><?= htmlspecialchars($solicitud['vendedor']) ?></td>
-                                    <td>
-                                        <?= match ($solicitud['tipo']) {
-                                            'venta_dificil' => '<span class="badge bg-primary">Venta difícil</span><br>+100 pts',
-                                            'seguimiento_3ventas' => '<span class="badge bg-success">3 Ventas</span><br>+300 pts',
-                                            'ventas_cruzadas' => '<span class="badge bg-info">Ventas cruzadas</span><br>+150 pts',
-                                            default => $solicitud['tipo']
-                                        } ?>
-                                    </td>
-                                    <td>
-                                        <a href="<?= htmlspecialchars($solicitud['evidencia']) ?>" target="_blank"
-                                            class="btn btn-sm btn-outline-primary">
-                                            <i class="fas fa-external-link-alt"></i> Ver
-                                        </a>
-                                    </td>
-                                    <td><?= !empty($solicitud['comentario']) ? htmlspecialchars($solicitud['comentario']) : '--' ?>
-                                    </td>
-                                    <td>
-                                        <div class="d-flex gap-2">
-                                            <form method="POST" class="mb-0">
-                                                <input type="hidden" name="solicitud_id" value="<?= $solicitud['id'] ?>">
-                                                <button type="submit" name="aprobar_solicitud"
-                                                    class="btn btn-sm btn-success"
-                                                    onclick="return confirm('¿Aprobar esta solicitud?')">
-                                                    <i class="fas fa-check"></i> Aprobar
+                                    <th>Vendedor</th>
+                                    <th>Recompensa</th>
+                                    <th>Puntos usados</th>
+                                    <th>Fecha</th>
+                                    <th>Estado</th>
+                                    <th>Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($recompensas_reclamadas as $r): ?>
+                                    <tr>
+                                        <td><?= htmlspecialchars($r['username']) ?></td>
+                                        <td><?= htmlspecialchars($r['recompensa']) ?></td>
+                                        <td><?= number_format($r['puntos_usados']) ?></td>
+                                        <td><?= date('d/m/Y H:i', strtotime($r['fecha_reclamo'])) ?></td>
+                                        <td>
+                                            <?php if ($r['pagada']): ?>
+                                                <span class="badge bg-success">Pagada</span>
+                                            <?php else: ?>
+                                                <span class="badge bg-warning text-dark">Pendiente</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <form method="POST" class="d-inline">
+                                                <input type="hidden" name="actualizar_estado_reclamo" value="1">
+                                                <input type="hidden" name="reclamo_id" value="<?= $r['id'] ?>">
+                                                <button type="submit" name="estado_pagado" value="1"
+                                                    class="btn btn-sm <?= $r['pagada'] ? 'btn-secondary' : 'btn-success' ?>"
+                                                    <?= $r['pagada'] ? 'disabled' : '' ?>>
+                                                    Marcar como Pagada
                                                 </button>
                                             </form>
-                                            <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal"
-                                                data-bs-target="#rechazoModal" data-solicitud-id="<?= $solicitud['id'] ?>">
-                                                <i class="fas fa-times"></i> Rechazar
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- Modal para el rechazo -->
-        <div class="modal fade" id="rechazoModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header bg-danger text-white">
-                        <h5 class="modal-title">Rechazar Solicitud</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
                     </div>
-                    <form method="POST" id="formRechazar">
-                        <div class="modal-body">
-                            <input type="hidden" name="solicitud_id" id="rechazo_solicitud_id">
-                            <div class="mb-3">
-                                <label class="form-label">Motivo del rechazo</label>
-                                <textarea name="comentario_rechazo" class="form-control" rows="3" required></textarea>
-                            </div>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                            <button type="submit" name="rechazar_solicitud" class="btn btn-danger">
-                                <i class="fas fa-times"></i> Confirmar Rechazo
-                            </button>
-                        </div>
-                    </form>
                 </div>
             </div>
-        </div>
-    </div>
+        <?php endif; ?>
+
+
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
@@ -594,11 +565,22 @@ include('header.php');
             border-radius: 5px;
         }
     </style>
-<?php
-if (isset($pdo)) {
-    $pdo = null;
-}
-?>
+    <?php
+    if (isset($pdo)) {
+        $pdo = null;
+    }
+    ?>
 
 
     <?php include('footer.php'); ?>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            $('#tabla_recompensas').DataTable({
+                language: {
+                    url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json'
+                },
+                order: [[3, 'desc']],
+                pageLength: 10
+            });
+        });
+    </script>

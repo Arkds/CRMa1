@@ -1,4 +1,3 @@
-
 <?php
 
 
@@ -58,7 +57,7 @@ $recompensas_historicas = [
     1600000 => "Tablet",
     2800000 => "TV - laptop básica ",
     4000000 => "¡Viaje doble pagado! "
-    
+
 ];
 
 // Procesar acciones del admin
@@ -146,9 +145,46 @@ if ($isAdmin && $_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 }
+// Procesar reclamo de recompensa
+if (!$isAdmin && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reclamar_recompensa'])) {
+    $puntos_requeridos = (int) $_POST['puntos_recompensa'];
+    $descripcion = $_POST['descripcion_recompensa'];
+
+    if ($puntos_historicos >= $puntos_requeridos) {
+        $pdo->beginTransaction();
+        try {
+            // 1. Descontar puntos al usuario
+            $stmt = $pdo->prepare("UPDATE users SET puntos_historicos = puntos_historicos - ? WHERE id = ?");
+            $stmt->execute([$puntos_requeridos, $user_id]);
+
+            // 2. Registrar el reclamo
+            $stmt = $pdo->prepare("INSERT INTO recompensas_historicas_reclamadas_usuarios 
+                (user_id, puntos_usados, recompensa) VALUES (?, ?, ?)");
+            $stmt->execute([$user_id, $puntos_requeridos, $descripcion]);
+
+            // 3. Registrar en historial
+            $stmt = $pdo->prepare("INSERT INTO historial_puntos_historicos 
+                (user_id, puntos, tipo, comentario) 
+                VALUES (?, ?, 'reclamo_recompensa', ?)");
+            $stmt->execute([$user_id, -$puntos_requeridos, "Reclamo de recompensa: $descripcion"]);
+
+            $pdo->commit();
+            $_SESSION['mensaje'] = "Recompensa reclamada correctamente.";
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            $_SESSION['error'] = "Ocurrió un error al reclamar la recompensa.";
+        }
+    } else {
+        $_SESSION['error'] = "No tienes suficientes puntos para reclamar esta recompensa.";
+    }
+
+    header("Location: super_recompensas.php");
+    exit;
+}
 
 
 // Procesar solicitud de puntos (vendedores)
+
 if (!$isAdmin && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['solicitar_puntos'])) {
     $tipo = $_POST['tipo'];
     $evidencia = filter_var($_POST['evidencia'], FILTER_SANITIZE_URL);
@@ -208,6 +244,12 @@ $puntos_para_siguiente = $siguiente_recompensa - $puntos_historicos;
 
 include('header.php');
 ?>
+<style>
+    .list-group-item .badge {
+        font-size: 0.85rem;
+        padding: 5px 10px;
+    }
+</style>
 
 
 <div class="container mt-4">
@@ -268,10 +310,56 @@ include('header.php');
                             <p>¡Felicidades! Has alcanzado estas recompensas que serán entregadas próximamente.</p>
                             <ul class="list-group">
                                 <?php foreach ($recompensas_alcanzadas as $puntos => $desc): ?>
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        <?= $desc ?>
-                                        <span class="badge bg-primary rounded-pill"><?= number_format($puntos) ?> pts</span>
+                                    <?php
+                                    // Verificar si ya fue reclamada
+                                    $stmt = $pdo->prepare("SELECT COUNT(*) FROM recompensas_historicas_reclamadas_usuarios 
+    WHERE user_id = ? AND recompensa = ?");
+                                    $stmt->execute([$user_id, $desc]);
+                                    $ya_reclamada = $stmt->fetchColumn() > 0;
+                                    ?>
+
+                                    <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap">
+                                        <div class="fw-bold"><?= $desc ?></div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="badge bg-primary rounded-pill"><?= number_format($puntos) ?> pts</span>
+
+                                            <?php
+                                            $stmt = $pdo->prepare("SELECT fecha_reclamo FROM recompensas_historicas_reclamadas_usuarios 
+            WHERE user_id = ? AND recompensa = ? ORDER BY fecha_reclamo DESC LIMIT 1");
+                                            $stmt->execute([$user_id, $desc]);
+                                            $reclamo = $stmt->fetch();
+                                            $ya_reclamada = $reclamo ? true : false;
+                                            ?>
+
+                                            <?php if (!$ya_reclamada): ?>
+                                                <form method="POST" class="m-0">
+                                                    <input type="hidden" name="puntos_recompensa" value="<?= $puntos ?>">
+                                                    <input type="hidden" name="descripcion_recompensa"
+                                                        value="<?= htmlspecialchars($desc) ?>">
+                                                    <button type="submit" name="reclamar_recompensa" class="btn btn-sm btn-success">
+                                                        Reclamar
+                                                    </button>
+                                                </form>
+                                            <?php else: ?>
+                                                <?php
+                                                $stmt = $pdo->prepare("SELECT fecha_reclamo, pagada FROM recompensas_historicas_reclamadas_usuarios 
+    WHERE user_id = ? AND recompensa = ? ORDER BY fecha_reclamo DESC LIMIT 1");
+                                                $stmt->execute([$user_id, $desc]);
+                                                $reclamo = $stmt->fetch();
+                                                ?>
+
+                                                <?php if ($reclamo): ?>
+                                                    <span class="badge <?= $reclamo['pagada'] ? 'bg-success' : 'bg-secondary' ?>">
+                                                        ✅ Reclamada<br>
+                                                        <small><?= date('d/m/Y H:i', strtotime($reclamo['fecha_reclamo'])) ?></small><br>
+                                                        <?= $reclamo['pagada'] ? '<i class="fas fa-check-circle"></i> Pagada' : '⏳ Pendiente' ?>
+                                                    </span>
+                                                <?php endif; ?>
+
+                                            <?php endif; ?>
+                                        </div>
                                     </li>
+
                                 <?php endforeach; ?>
                             </ul>
                         </div>
@@ -387,7 +475,7 @@ include('header.php');
                             </div>
                         </div>
 
-                        
+
                     </div>
 
                     <div class="mb-3">
@@ -549,7 +637,7 @@ include('header.php');
                                     </td>
                                     <td><?= !empty($solicitud['comentario']) ? htmlspecialchars($solicitud['comentario']) : '--' ?>
                                     </td>
-                                    
+
                                     <td>
                                         <div class="d-flex gap-2">
                                             <form method="POST" class="mb-0">
@@ -565,7 +653,7 @@ include('header.php');
                                             </button>
                                         </div>
                                     </td>
-                                    
+
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>

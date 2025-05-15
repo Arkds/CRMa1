@@ -82,9 +82,9 @@ include('header.php');
 
 <div class="container mt-4">
     <?php if ($role === 'admin'): ?>
-    <?php
-    // Obtener minutos pendientes agrupados por usuario
-    $stmt = $pdo->query("
+        <?php
+        // Obtener minutos pendientes agrupados por usuario
+        $stmt = $pdo->query("
         SELECT 
             u.username, 
             SUM(s.minutos_castigo) - SUM(COALESCE(s.minutos_recuperados, 0)) AS pendientes
@@ -94,31 +94,31 @@ include('header.php');
         HAVING pendientes > 0
         ORDER BY pendientes DESC
     ");
-    $pendientesPorUsuario = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    ?>
-    <div class="d-flex flex-wrap gap-2 mb-3">
-        <?php foreach ($pendientesPorUsuario as $p): ?>
-            <span class="badge rounded-pill bg-warning text-dark">
-                <?= htmlspecialchars($p['username']) ?>: <?= (int)$p['pendientes'] ?> min
-            </span>
-        <?php endforeach; ?>
-    </div>
-<?php else: ?>
-    <?php
-    $stmt = $pdo->prepare("
+        $pendientesPorUsuario = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        ?>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            <?php foreach ($pendientesPorUsuario as $p): ?>
+                <span class="badge rounded-pill bg-warning text-dark">
+                    <?= htmlspecialchars($p['username']) ?>: <?= (int) $p['pendientes'] ?> min
+                </span>
+            <?php endforeach; ?>
+        </div>
+    <?php else: ?>
+        <?php
+        $stmt = $pdo->prepare("
         SELECT SUM(minutos_castigo) - SUM(COALESCE(minutos_recuperados, 0)) AS pendientes
         FROM sanciones
         WHERE user_id = :user_id
     ");
-    $stmt->execute([':user_id' => $user_id]);
-    $pendientes = (int) $stmt->fetchColumn();
-    ?>
-    <div class="alert alert-warning text-center fw-bold">
-        ⏱️ Minutos pendientes por recuperar: <span class="text-danger"><?= $pendientes ?> min</span>
-    </div>
-<?php endif; ?>
+        $stmt->execute([':user_id' => $user_id]);
+        $pendientes = (int) $stmt->fetchColumn();
+        ?>
+        <div class="alert alert-warning text-center fw-bold">
+            ⏱️ Minutos pendientes por recuperar: <span class="text-danger"><?= $pendientes ?> min</span>
+        </div>
+    <?php endif; ?>
 
-   
+
 
     <h2> Historial de Asistencia</h2>
     <table class="table table-striped table-bordered mt-3 display compact" id="tablaAsistencia">
@@ -145,8 +145,29 @@ include('header.php');
             </tr>
         </thead>
         <tbody>
+
             <?php foreach ($asistencias as $a): ?>
                 <tr>
+                    <?php
+                    $hora_entrada = $a['hora_entrada'];
+                    $hora_esperada = null;
+                    $horarios_entrada = ['08:00:00', '14:00:00', '17:00:00', '20:00:00'];
+
+                    foreach (array_reverse($horarios_entrada) as $h) {
+                        if ($hora_entrada >= $h) {
+                            $hora_esperada = $h;
+                            break;
+                        }
+                    }
+
+                    $minutos_tarde = 0;
+                    if ($hora_esperada) {
+                        $entrada = new DateTime($a['fecha'] . ' ' . $hora_entrada);
+                        $esperada = new DateTime($a['fecha'] . ' ' . $hora_esperada);
+                        $minutos_tarde = $entrada > $esperada ? round(($entrada->getTimestamp() - $esperada->getTimestamp()) / 60) : 0;
+                    }
+                    ?>
+
                     <?php if ($role === 'admin'): ?>
                         <td><?= htmlspecialchars($a['username']) ?></td><?php endif; ?>
                     <td><?= $a['fecha'] ?></td>
@@ -154,8 +175,12 @@ include('header.php');
                     <td>
                         <span class="badge bg-<?= $a['tipo_entrada'] === 'tardanza' ? 'danger' : 'success' ?>">
                             <?= ucfirst($a['tipo_entrada']) ?>
+                            <?php if ($a['tipo_entrada'] === 'tardanza' && $minutos_tarde > 0): ?>
+                                +<?= $minutos_tarde ?> min
+                            <?php endif; ?>
                         </span>
                     </td>
+
                     <td><?= $a['hora_salida'] ?? '<span class="text-muted">-</span>' ?></td>
                     <td>
                         <span
@@ -320,24 +345,24 @@ include('header.php');
 
 <script>
     function editarSancion(id) {
-    fetch('?get_sancion=' + id)
+        fetch('?get_sancion=' + id)
 
-        .then(response => response.json())
-        .then(data => {
-            const modal = new bootstrap.Modal(document.getElementById('modalEditarSancion'));
+            .then(response => response.json())
+            .then(data => {
+                const modal = new bootstrap.Modal(document.getElementById('modalEditarSancion'));
 
-            document.getElementById('sancion_id').value = id;
-            document.querySelector('#modalEditarSancion input[name="minutos_castigo"]').value = data.minutos_castigo || 0;
-            document.querySelector('#modalEditarSancion input[name="minutos_recuperados"]').value = data.minutos_recuperados || 0;
-            document.querySelector('#modalEditarSancion input[name="descuento_soles"]').value = data.descuento_soles || 0;
+                document.getElementById('sancion_id').value = id;
+                document.querySelector('#modalEditarSancion input[name="minutos_castigo"]').value = data.minutos_castigo || 0;
+                document.querySelector('#modalEditarSancion input[name="minutos_recuperados"]').value = data.minutos_recuperados || 0;
+                document.querySelector('#modalEditarSancion input[name="descuento_soles"]').value = data.descuento_soles || 0;
 
-            modal.show();
-        })
-        .catch(err => {
-            console.error('Error al obtener sanción:', err);
-            alert('No se pudo cargar la sanción. Revisa la consola.');
-        });
-}
+                modal.show();
+            })
+            .catch(err => {
+                console.error('Error al obtener sanción:', err);
+                alert('No se pudo cargar la sanción. Revisa la consola.');
+            });
+    }
 
 </script>
 

@@ -56,7 +56,7 @@ $asistencia = $stmt->fetch(PDO::FETCH_ASSOC);
 
 $horarios_entrada = ['08:00:00', '14:00:00', '17:00:00', '20:00:00'];
 $horarios_salida = ['14:00:00', '17:00:00', '20:00:00', '23:00:00'];
-define('MARGEN_TARDANZA_MINUTOS', 1);
+define('MARGEN_TARDANZA_MINUTOS', 2);
 define('UMBRAL_EXTRA_MINUTOS', 1);
 
 $ahora = new DateTime('now', new DateTimeZone('America/Lima'));
@@ -67,14 +67,21 @@ $horaActual = $ahora->format('H:i:s');
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['entrada']) && !$asistencia) {
         // Encontrar el horario más cercano hacia atrás
+        // Buscar el horario más próximo con tolerancia de 15 min antes
+        define('MARGEN_ANTICIPADO_MINUTOS', 15);
         $horaEsperada = null;
-        foreach (array_reverse($horarios_entrada) as $hora) {
+
+        foreach ($horarios_entrada as $hora) {
             $esperada = DateTime::createFromFormat('Y-m-d H:i:s', $fechaHoy . ' ' . $hora, new DateTimeZone('America/Lima'));
-            if ($ahora >= $esperada) {
+            $inicioTolerancia = clone $esperada;
+            $inicioTolerancia->modify("-" . MARGEN_ANTICIPADO_MINUTOS . " minutes");
+
+            if ($ahora >= $inicioTolerancia && $ahora <= $esperada->modify("+60 minutes")) {
                 $horaEsperada = $esperada;
                 break;
             }
         }
+
 
 
         $tipo = 'normal';
@@ -160,18 +167,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ? round(($horaSalida->getTimestamp() - $horaEsperadaSalida->getTimestamp()) / 60)
             : 0;
 
+        $minutosExtra = ($horaSalida > $horaEsperadaSalida)
+            ? round(($horaSalida->getTimestamp() - $horaEsperadaSalida->getTimestamp()) / 60)
+            : 0;
+
         if ($minutosExtra >= UMBRAL_EXTRA_MINUTOS) {
             // Buscar minutos de castigo pendientes
             $stmt = $pdo->prepare("SELECT SUM(minutos_castigo) - SUM(COALESCE(minutos_recuperados, 0)) FROM sanciones WHERE user_id = :user_id");
             $stmt->execute([':user_id' => $user_id]);
             $pendientes = (int) $stmt->fetchColumn();
 
-            $aplicado_a_sancion = 0;
-            $puntos = 0;
-            $minutosAplicables = $minutosExtra;
-
             if ($pendientes > 0) {
                 $minutosAplicables = min($pendientes, $minutosExtra);
+
                 // Aplicar recuperación a sanción
                 $stmt = $pdo->prepare("
             UPDATE sanciones 
@@ -183,22 +191,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':rec' => $minutosAplicables,
                     ':user_id' => $user_id
                 ]);
-                $aplicado_a_sancion = 1;
+
+                // Registrar recuperación en la tabla correspondiente
+                $stmt = $pdo->prepare("INSERT INTO recuperaciones (user_id, asistencia_id, fecha, minutos_extra, aplicado_a_sancion, puntos_generados)
+            VALUES (:user_id, :asistencia_id, :fecha, :minutos, 1, 0)");
+                $stmt->execute([
+                    ':user_id' => $user_id,
+                    ':asistencia_id' => $asistencia['id'],
+                    ':fecha' => $fechaHoy,
+                    ':minutos' => $minutosAplicables
+
+                ]);
             }
 
-            // Registrar recuperación en la tabla correspondiente
-            $stmt = $pdo->prepare("INSERT INTO recuperaciones (user_id, asistencia_id, fecha, minutos_extra, aplicado_a_sancion, puntos_generados)
-        VALUES (:user_id, :asistencia_id, :fecha, :minutos, :aplicado, :puntos)");
-            $stmt->execute([
-                ':user_id' => $user_id,
-                ':asistencia_id' => $asistencia['id'],
-                ':fecha' => $fechaHoy,
-                ':minutos' => $minutosAplicables,
-                ':aplicado' => $aplicado_a_sancion,
-                ':puntos' => 0
-
-            ]);
+            // Si no hay pendientes, no se registra nada
         }
+
 
 
     }
