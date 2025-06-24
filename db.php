@@ -1,6 +1,6 @@
 <?php
 $host = 'localhost';
-$dbname = 'CRM';
+$dbname = '2';
 $user = 'root';
 $pass = '';
 

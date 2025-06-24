@@ -77,7 +77,7 @@ if (isset($_GET['draw'])) {
                 SELECT 1 FROM (
                     SELECT 
                         UPPER(TRIM(client_phone)) AS normalized_name,
-                        UPPER(TRIM(SUBSTRING_INDEX(product_name, '|', -1))) AS normalized_product,
+                        UPPER(TRIM(SUBSTRING_INDEX(product_name, '|', 1))) AS normalized_product,
                         COUNT(*) AS cnt
                     FROM (
                         SELECT * FROM sales 
@@ -89,7 +89,7 @@ if (isset($_GET['draw'])) {
                     HAVING cnt > 1
                 ) dup
                 WHERE 
-                    dup.normalized_product = UPPER(TRIM(SUBSTRING_INDEX(s.product_name, '|', -1))) AND
+                    dup.normalized_product = UPPER(TRIM(SUBSTRING_INDEX(s.product_name, '|', 1))) AND
                     dup.normalized_name = UPPER(TRIM(s.client_phone))
             )
         )
@@ -112,12 +112,18 @@ if (isset($_GET['draw'])) {
     $params = [];
 
     // Aplicar filtros normales al modo AJAX
-    if (isset($_GET['currency']) && is_array($_GET['currency']) && count($_GET['currency']) > 0) {
+    // Asegurar que currency llegue siempre como array
+$currencyFilter = $_GET['currency'] ?? [];
+if (!is_array($currencyFilter)) {
+    $currencyFilter = [$currencyFilter]; // lo convierte si era string
+}
 
-        $placeholders = implode(',', array_fill(0, count($_GET['currency']), '?'));
-        $sqlBase .= " AND s.currency IN ($placeholders)";
-        $params = array_merge($params, $_GET['currency']);
-    }
+if (count($currencyFilter) > 0) {
+    $placeholders = implode(',', array_fill(0, count($currencyFilter), '?'));
+    $sqlBase .= " AND s.currency IN ($placeholders)";
+    $params = array_merge($params, $currencyFilter);
+}
+
 
     if (!empty($_GET['date'])) {
         $sqlBase .= " AND s.created_at >= ? AND s.created_at < ? + INTERVAL 1 DAY";
@@ -153,7 +159,8 @@ if (isset($_GET['draw'])) {
     $stmtFiltered->execute($params);
     $totalFiltered = $stmtFiltered->fetchColumn();
     // Calcular totales por moneda sobre el conjunto filtrado completo (no solo paginado)
-    $stmtResumen = $pdo->prepare("SELECT s.currency, SUM(s.quantity) AS total_qty, SUM(s.quantity * s.price) AS total_amount $sqlBase");
+    $stmtResumen = $pdo->prepare("SELECT s.currency, SUM(s.quantity) AS total_qty, SUM(s.quantity * s.price) AS total_amount $sqlBase GROUP BY s.currency");
+
     $stmtResumen->execute($params);
     $resumenTotales = $stmtResumen->fetchAll(PDO::FETCH_ASSOC);
 
@@ -354,82 +361,78 @@ include('header.php')
         <!--<button class="btn btn-secondary mb-3" onclick="window.location.replace('index.php');">Volver</button>-->
 
         <form method="GET" class="mb-4">
-            <div class="row">
-                <div class="col-md-3">
-                    <label for="date" class="form-label">Filtrar por fecha exacta</label>
-                    <input type="date" class="form-control" id="date" name="date"
-                        value="<?= htmlspecialchars($date ?? '', ENT_QUOTES, 'UTF-8') ?>">
-                </div>
-                <div class="col-md-3">
-                    <label for="start_date" class="form-label">Desde</label>
-                    <input type="date" class="form-control" id="start_date" name="start_date"
-                        value="<?= htmlspecialchars($startDate ?? '', ENT_QUOTES, 'UTF-8') ?>">
-                </div>
-                <div class="col-md-3">
-                    <label for="end_date" class="form-label">Hasta</label>
-                    <input type="date" class="form-control" id="end_date" name="end_date"
-                        value="<?= htmlspecialchars($endDate ?? '', ENT_QUOTES, 'UTF-8') ?>">
-                </div>
-                <div class="col-md-3">
-                    <label for="user_id" class="form-label">Usuario</label>
-                    <select class="form-select" id="user_id" name="user_id">
-                        <option value="">Todos los Usuarios</option>
-                        <?php foreach ($users as $user): ?>
-                            <option value="<?= $user['id'] ?>" <?= $selectedUser == $user['id'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($user['username'] ?? '', ENT_QUOTES, 'UTF-8') ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-            </div>
+  <div class="row g-2 align-items-end">
 
-            <!-- Filtro de monedas mejor integrado -->
-            <div class="col-md-3 mt-2">
-                <div class="border p-2 rounded">
-                    <label class="form-label d-block mb-1">Moneda</label>
-                    <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="checkbox" name="currency[]" value="MXN" id="currencyMXN"
-                            <?= (empty($_GET['currency']) || in_array('MXN', $_GET['currency'] ?? [])) ? 'checked' : '' ?>>
-                        <label class="form-check-label small" for="currencyMXN">MXN</label>
-                    </div>
-                    <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="checkbox" name="currency[]" value="PEN" id="currencyPEN"
-                            <?= in_array('PEN', $_GET['currency'] ?? []) ? 'checked' : '' ?>>
-                        <label class="form-check-label small" for="currencyPEN">PEN</label>
-                    </div>
-                    <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="checkbox" name="currency[]" value="USD" id="currencyUSD"
-                            <?= in_array('USD', $_GET['currency'] ?? []) ? 'checked' : '' ?>>
-                        <label class="form-check-label small" for="currencyUSD">USD</label>
-                    </div>
-                </div>
-            </div>
+    <div class="col-md-2">
+      <label for="date" class="form-label small mb-1">Fecha exacta</label>
+      <input type="date" class="form-control form-control-sm" id="date" name="date"
+        value="<?= htmlspecialchars($date ?? '', ENT_QUOTES, 'UTF-8') ?>">
+    </div>
 
-            <div class="row mt-3">
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100">Filtrar</button>
-                </div>
-            </div>
+    <div class="col-md-2">
+      <label for="start_date" class="form-label small mb-1">Desde</label>
+      <input type="date" class="form-control form-control-sm" id="start_date" name="start_date"
+        value="<?= htmlspecialchars($startDate ?? '', ENT_QUOTES, 'UTF-8') ?>">
+    </div>
 
-        </form>
+    <div class="col-md-2">
+      <label for="end_date" class="form-label small mb-1">Hasta</label>
+      <input type="date" class="form-control form-control-sm" id="end_date" name="end_date"
+        value="<?= htmlspecialchars($endDate ?? '', ENT_QUOTES, 'UTF-8') ?>">
+    </div>
+
+    <div class="col-md-2">
+      <label for="user_id" class="form-label small mb-1">Usuario</label>
+      <select class="form-select form-select-sm" id="user_id" name="user_id">
+        <option value="">Todos</option>
+        <?php foreach ($users as $user): ?>
+          <option value="<?= $user['id'] ?>" <?= $selectedUser == $user['id'] ? 'selected' : '' ?>>
+            <?= htmlspecialchars($user['username'] ?? '', ENT_QUOTES, 'UTF-8') ?>
+          </option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label small mb-1">Moneda</label>
+      <div class="d-flex flex-wrap gap-2">
+        <?php
+        $monedas = ['MXN', 'PEN', 'USD'];
+        foreach ($monedas as $mon):
+          $checked = (empty($_GET['currency']) || in_array($mon, $_GET['currency'] ?? [])) ? 'checked' : '';
+        ?>
+          <div class="form-check form-check-inline m-0">
+            <input class="form-check-input" type="checkbox" name="currency[]" value="<?= $mon ?>" id="currency<?= $mon ?>" <?= $checked ?>>
+            <label class="form-check-label small" for="currency<?= $mon ?>"><?= $mon ?></label>
+          </div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+
+    <div class="col-md-1 d-grid">
+      <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+    </div>
+    
+  </div>
+</form>
+
+
         <div class="mt-4">
             <h4>Resumen de Totales (sin filtrar)</h4>
-            <div class="row">
-                <?php foreach ($totalsByCurrencyFijo as $currency => $totals): ?>
-                    <div class="col-md-3 mb-1">
-                        <div class="card">
-                            <div class="card-body small">
-                                <h6 class="card-title mb-1 text-uppercase"><?= $currency ?></h6>
-                                <p class="card-text mb-0">
-                                    <strong>Productos:</strong> <?= $totals['quantity'] ?><br>
-                                    <strong>Monto Total:</strong> <?= $currency ?>
-                                    <?= number_format($totals['amount'], 2) ?>
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            </div>
+            <div class="row g-2">
+  <?php foreach ($totalsByCurrencyFijo as $currency => $totals): ?>
+    <div class="col-6 col-sm-4 col-md-3 col-lg-2">
+      <div class="card border-0 shadow-sm rounded-3 bg-light">
+        <div class="card-body p-2 text-center">
+          <div class="fw-semibold text-muted small"><?= $currency ?></div>
+          <div class="fw-bold fs-6"><?= number_format($totals['amount'], 2) ?> <?= $currency ?></div>
+          <div class="text-secondary small"><?= $totals['quantity'] ?> productos</div>
+        </div>
+      </div>
+    </div>
+  <?php endforeach; ?>
+</div>
+
 
             <div class="alert alert-primary mt-3">
                 <strong>Total General de Productos:</strong> <?= $totalQuantityFijo ?><br>
@@ -438,15 +441,15 @@ include('header.php')
                 <?php endif; ?>
             </div>
         </div>
+      <h4 class="mt-4">Resumen de Totales (filtrado)</h4>
+<div id="filteredSummaryCards" class="row"></div>
 
-
-
-
-
-
-        <!-- Tabla de Ventas -->
+<div id="filteredTotalAlert" class="alert alert-info mt-3 d-none">
+    <strong>Total Filtrado de Productos:</strong> <span id="totalQuantity"></span><br>
+    <strong>Monto Total Filtrado:</strong> <span id="totalAmount"></span>
+</div>
         <h2>Ventas Registradas</h2>
-        <!-- Botón y collapse de filtros especiales -->
+        
         <button class="btn btn-outline-danger mb-3" type="button" data-bs-toggle="collapse"
             data-bs-target="#errorFilters">
             🔍 Filtros Especiales de Errores
@@ -470,7 +473,7 @@ include('header.php')
             </div>
         </div>
 
-        <table id="salesTable" class="table table-bordered table-striped">
+        <table id="salesTable" class="table table-bordered table-striped display compact" >
             <thead>
                 <tr>
                     <th>ID</th>
@@ -562,9 +565,41 @@ include('header.php')
                     ,
                     { data: 'observations' }
                 ],
+                
                 language: {
                     url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
-                }
+                },
+drawCallback: function (settings) {
+  const json = settings.json;
+  if (!json || !json.summary) return;
+
+  const container = document.getElementById('filteredSummaryCards');
+  container.innerHTML = '';
+
+  const byCurrency = json.summary.by_currency || {};
+
+  Object.entries(byCurrency).forEach(([currency, data]) => {
+    const card = document.createElement('div');
+    card.className = 'col-6 col-sm-4 col-md-3 col-lg-2';
+    card.innerHTML = `
+      <div class="card border-0 shadow-sm rounded-3 bg-white">
+        <div class="card-body p-2 text-center">
+          <div class="fw-semibold text-muted small">${currency}</div>
+          <div class="fw-bold fs-6">${data.amount.toFixed(2)} ${currency}</div>
+          <div class="text-secondary small">${data.quantity} productos</div>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+
+  document.getElementById('totalQuantity').textContent = json.summary.total_quantity;
+  document.getElementById('totalAmount').textContent = json.summary.total_amount.toFixed(2);
+  document.getElementById('filteredTotalAlert').classList.remove('d-none');
+}
+
+
+                
             });
 
             $('#filterDuplicatedPhones').on('change', function () {

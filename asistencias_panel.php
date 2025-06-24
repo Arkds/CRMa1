@@ -1,9 +1,6 @@
 <?php
 require 'datos_index.php'; // para tener $pdo, $user_id, $role
 
-
-
-// Actualización desde el modal
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sancion_id'])) {
     $id = (int) $_POST['sancion_id'];
     $min_castigo = (int) $_POST['minutos_castigo'];

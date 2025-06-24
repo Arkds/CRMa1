@@ -74,9 +74,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach ($horarios_entrada as $hora) {
             $esperada = DateTime::createFromFormat('Y-m-d H:i:s', $fechaHoy . ' ' . $hora, new DateTimeZone('America/Lima'));
             $inicioTolerancia = clone $esperada;
-            $inicioTolerancia->modify("-" . MARGEN_ANTICIPADO_MINUTOS . " minutes");
+            $limiteSuperior = (clone $esperada)->modify("+60 minutes");
 
-            if ($ahora >= $inicioTolerancia && $ahora <= $esperada->modify("+60 minutes")) {
+            if ($ahora >= $inicioTolerancia && $ahora <= $limiteSuperior) {
+
                 $horaEsperada = $esperada;
                 break;
             }
@@ -133,18 +134,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
         }
     } elseif (isset($_POST['salida']) && $asistencia && $asistencia['hora_salida'] === null) {
-        $horaEntrada = new DateTime($asistencia['hora_entrada']);
+        $horaEntrada = new DateTime($fechaHoy . ' ' . $asistencia['hora_entrada'], new DateTimeZone('America/Lima'));
+
         $horaSalida = new DateTime($fechaHoy . ' ' . $horaActual, new DateTimeZone('America/Lima'));
 
         // Buscar hora esperada de salida según la hora de entrada
         $horaEsperadaSalida = null;
-        for ($i = count($horarios_entrada) - 1; $i >= 0; $i--) {
-            $entradaHora = new DateTime($fechaHoy . ' ' . $horarios_entrada[$i], new DateTimeZone('America/Lima'));
-            if ($horaEntrada >= $entradaHora) {
-                $horaEsperadaSalida = new DateTime($fechaHoy . ' ' . $horarios_salida[$i], new DateTimeZone('America/Lima'));
-                break;
-            }
-        }
+
+for ($i = 0; $i < count($horarios_entrada); $i++) {
+    $inicio = new DateTime($fechaHoy . ' ' . $horarios_entrada[$i], new DateTimeZone('America/Lima'));
+    $fin = ($i + 1 < count($horarios_entrada))
+        ? new DateTime($fechaHoy . ' ' . $horarios_entrada[$i + 1], new DateTimeZone('America/Lima'))
+        : new DateTime($fechaHoy . ' 23:59:59', new DateTimeZone('America/Lima'));
+
+    if ($horaEntrada >= $inicio && $horaEntrada < $fin) {
+        $horaEsperadaSalida = new DateTime($fechaHoy . ' ' . $horarios_salida[$i], new DateTimeZone('America/Lima'));
+        break;
+    }
+}
+
 
         if (!$horaEsperadaSalida) {
             $horaEsperadaSalida = new DateTime($fechaHoy . ' 23:00:00', new DateTimeZone('America/Lima'));
@@ -162,20 +170,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
 
         // Calcular minutos extra para recuperación si aplica
-        // Calcular minutos extra para recuperación si aplica
         $minutosExtra = ($horaSalida > $horaEsperadaSalida)
             ? round(($horaSalida->getTimestamp() - $horaEsperadaSalida->getTimestamp()) / 60)
             : 0;
 
-        $minutosExtra = ($horaSalida > $horaEsperadaSalida)
-            ? round(($horaSalida->getTimestamp() - $horaEsperadaSalida->getTimestamp()) / 60)
-            : 0;
-
+        
         if ($minutosExtra >= UMBRAL_EXTRA_MINUTOS) {
             // Buscar minutos de castigo pendientes
             $stmt = $pdo->prepare("SELECT SUM(minutos_castigo) - SUM(COALESCE(minutos_recuperados, 0)) FROM sanciones WHERE user_id = :user_id");
             $stmt->execute([':user_id' => $user_id]);
             $pendientes = (int) $stmt->fetchColumn();
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM recuperaciones WHERE asistencia_id = :id");
+$stmt->execute([':id' => $asistencia['id']]);
+$yaRecuperado = $stmt->fetchColumn();
 
             if ($pendientes > 0) {
                 $minutosAplicables = min($pendientes, $minutosExtra);

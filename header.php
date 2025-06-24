@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="en">
 
@@ -110,10 +108,11 @@
                 <button class="nav-link btn btn-link text-white nav-icons-big" onclick="window.history.back();">
                     <i class="bi bi-arrow-left"></i>
                 </button>
-                <button class="nav-link btn btn-link text-white nav-icons-big" onclick="window.location.href='index.php';">
-                            <i class="bi bi-house"></i>
-                        </button>
-              
+                <button class="nav-link btn btn-link text-white nav-icons-big"
+                    onclick="window.location.href='index.php';">
+                    <i class="bi bi-house"></i>
+                </button>
+
 
                 <button class="nav-link btn btn-link text-white nav-icons-big" onclick="window.location.reload();">
                     <i class="bi bi-arrow-clockwise"></i>
@@ -166,24 +165,32 @@
                     <button class="nav-link btn btn-link text-white" onclick="window.location.href='tracin_crud.php';">
                         Seguimientos
                     </button>
-                    
-                    
+
+
                     <?php if (isset($isAdmin) && $isAdmin): ?>
                         <button class="nav-link btn btn-link text-white"
                             onclick="window.location.href='certificaciones.php';">
                             Certificaciones
                         </button>
                     <?php endif; ?>
-                    
+
                 </div>
-               
+
                 <div class="ms-auto d-flex gap-2 align-items-center">
-                     <span class="text-white"><em>✓ </em><strong><?= htmlspecialchars($username) ?></strong></span>
-                    
+                    <span class="text-white"><em>✓ </em><strong><?= htmlspecialchars($username) ?></strong></span>
+
                     <button class="nav-link btn btn-link text-white nav-icons-big"
                         onclick="window.location.href='super_recompensas.php';">
                         <i class="bi bi-bar-chart-line"></i>
                     </button>
+                    <button class="nav-link btn btn-link text-white nav-icons-big"
+                        onclick="window.location.href='manual.php';">
+                        <i class="bi bi-file-earmark-text"></i>
+                        <span  style="font-size: 0.75rem;" >
+                            Manual de usuario
+                        </sp>
+                    </button>
+
                     <button class="nav-link btn btn-link text-white nav-icons-big"
                         onclick="window.location.href='logout.php';">
                         <i class="bi bi-box-arrow-right"></i>
