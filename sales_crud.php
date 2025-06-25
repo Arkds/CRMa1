@@ -562,11 +562,15 @@ include('header.php')
             clientPhoneLabel.textContent = 'Número de WhatsApp';
             clientPhone.placeholder = 'Ej: +51987654321';
             clientPhone.classList.add('border-whatsapp');
+                document.getElementById('saleTypeLabel').textContent = 'WhatsApp';
+
         } else {
             // Messenger
             clientPhoneLabel.textContent = 'Nombre del Cliente';
             clientPhone.placeholder = 'Ej: Juan Pérez';
             clientPhone.classList.add('border-messenger');
+                document.getElementById('saleTypeLabel').textContent = 'Messenger';
+
         }
     }
 
@@ -637,7 +641,7 @@ include('header.php')
         if (basePrice === 100) variants.push(99.00, 99.90, 80.00);
         else if (basePrice === 150) variants.push(149.00, 149.90, 130.00);
         else if (basePrice === 19.90) variants.push(19.00, 20.00);
-        else if (basePrice === 9.90) variants.push(8.00, 9.00);
+        else if (basePrice === 9.90) variants.push(10.00,8.00, 9.00);
         return [...new Set(variants.map(v => parseFloat(v.toFixed(2))))];
     }
 
@@ -788,7 +792,8 @@ include('header.php')
         const coincidencia = ventasHoy.find(v => {
             const vProd = normalizarProducto(v.product_name);
             const vTel = normalizarTelefono(v.client_phone || '');
-            return vProd === producto && vTel === telefono && parseInt(v.user_id) !== parseInt(currentUserId);
+            return vProd === producto && vTel === telefono;
+
         });
 
         if (coincidencia) {
@@ -990,28 +995,39 @@ include('header.php')
 
 </script>
 <script>
+    const form = document.querySelector("form");
+    const currencyHidden = document.getElementById('currency_hidden');
     let lastClickedCurrency = null;
 
+    // Capturar qué botón fue clickeado
     document.querySelectorAll("button[type='submit'][name='currency']").forEach(btn => {
         btn.addEventListener("click", () => {
             lastClickedCurrency = btn.value;
         });
     });
 
-    document.querySelector("form").addEventListener("submit", function (e) {
+    form.addEventListener("submit", function (e) {
         e.preventDefault();
 
-        const precio = parseFloat(document.getElementById('price').value);
-        const moneda = document.activeElement?.value;
-        const productoInput = document.getElementById('product_name').value;
+        // Bloquear botones de submit
+        const buttons = form.querySelectorAll("button[type='submit']");
+        buttons.forEach(btn => btn.disabled = true);
 
+        // Rehabilitar después de 3 segundos por si algo falla
+        setTimeout(() => {
+            buttons.forEach(btn => btn.disabled = false);
+        }, 2000);
+
+        // Validación de producto/moneda
+        const precio = parseFloat(document.getElementById('price').value);
+        const productoInput = document.getElementById('product_name').value;
         const partes = productoInput.split('|');
-        if (partes.length !== 2 || isNaN(precio) || !moneda) {
-            document.getElementById('currency_hidden').value = lastClickedCurrency || moneda || 'MXN';
-            this.submit();
+
+        if (partes.length !== 2 || isNaN(precio)) {
+            currencyHidden.value = lastClickedCurrency || 'MXN';
+            form.submit();
             return;
         }
-
 
         const nombre = partes[0].trim().toLowerCase();
         const canal = partes[1].trim().toLowerCase();
@@ -1021,91 +1037,77 @@ include('header.php')
             p.channel.toLowerCase() === canal
         );
 
-        if (productoCoincidente) {
-            const precioBase = parseFloat(productoCoincidente.price);
-            let monedaSugerida = 'MXN';
-            if (precioBase < 100 && precio >= (precioBase - 5) && precio <= (precioBase + 5)) {
-                monedaSugerida = 'PEN';
-            }
+        const moneda = lastClickedCurrency || 'MXN';
 
-            // Si la moneda es incorrecta primero
-            if (moneda !== monedaSugerida) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: '¿Moneda incorrecta?',
-                    html: `Estás ingresando <strong>${moneda}</strong> pero se sugiere <strong>${monedaSugerida}</strong> según el precio <strong>${precio}</strong>.`,
-                    showCancelButton: true,
-                    confirmButtonText: 'Insertar de todas formas',
-                    cancelButtonText: 'Cancelar',
-                    confirmButtonColor: '#198754',
-                    cancelButtonColor: '#d33'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        if (lastClickedCurrency) {
-                            document.getElementById('currency_hidden').value = lastClickedCurrency;
-                        }
-
-                        e.target.submit();
-                    }
-                });
-                return;
-            }
-
-            // Luego validamos el rango de precios
-            let tolerancia = { min: precioBase, max: precioBase };
-            if (moneda === 'MXN') {
-                tolerancia.min = precioBase - 50;
-                tolerancia.max = precioBase + 80;
-            } else if (moneda === 'PEN') {
-                tolerancia.min = precioBase - 10;
-                tolerancia.max = precioBase + 10;
-            }
-
-            const dentroDelRango = precio >= tolerancia.min && precio <= tolerancia.max;
-
-            if (!dentroDelRango) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Precio fuera de rango esperado',
-                    html: `El producto "<strong>${productoCoincidente.name}</strong>" con canal "<strong>${productoCoincidente.channel}</strong>" tiene un precio base de <strong>${precioBase.toFixed(2)}</strong>.<br>
-    Estás ingresando <strong>${precio.toFixed(2)} ${moneda}</strong>, lo cual está fuera del rango permitido:<br>
-    <strong>${tolerancia.min.toFixed(2)} a ${tolerancia.max.toFixed(2)}</strong>.`,
-                    showCancelButton: true,
-                    confirmButtonText: 'Insertar de todas formas',
-                    cancelButtonText: 'Cancelar',
-                    confirmButtonColor: '#198754',
-                    cancelButtonColor: '#d33'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        if (lastClickedCurrency) {
-                            document.getElementById('currency_hidden').value = lastClickedCurrency || moneda || 'MXN';
-                        }
-
-                        e.target.submit();
-                    }
-                });
-            } else {
-                if (lastClickedCurrency) {
-                    document.getElementById('currency_hidden').value = lastClickedCurrency || moneda || 'MXN';
-                }
-
-
-
-                e.target.submit(); // Todo correcto
-            }
-
-        } else {
-            // Producto no encontrado
-            if (lastClickedCurrency) {
-                document.getElementById('currency_hidden').value = lastClickedCurrency || moneda || 'MXN';
-            }
-
-            e.target.submit();
-
+        if (!productoCoincidente) {
+            currencyHidden.value = moneda;
+            form.submit();
+            return;
         }
-    });
 
+        const precioBase = parseFloat(productoCoincidente.price);
+        let monedaSugerida = precioBase < 100 ? 'PEN' : 'MXN';
+
+        // Validar sugerencia de moneda
+        if (moneda !== monedaSugerida) {
+            Swal.fire({
+                icon: 'warning',
+                title: '¿Moneda incorrecta?',
+                html: `Estás ingresando <strong>${moneda}</strong> pero se sugiere <strong>${monedaSugerida}</strong> según el precio.`,
+                showCancelButton: true,
+                confirmButtonText: 'Insertar de todas formas',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#198754',
+                cancelButtonColor: '#d33'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    currencyHidden.value = moneda;
+                    form.submit();
+                }
+            });
+            return;
+        }
+
+        // Validar rango de precio
+        let tolerancia = { min: precioBase, max: precioBase };
+        if (moneda === 'MXN') {
+            tolerancia.min = precioBase - 50;
+            tolerancia.max = precioBase + 80;
+        } else if (moneda === 'PEN') {
+            tolerancia.min = precioBase - 10;
+            tolerancia.max = precioBase + 10;
+        }
+
+        const dentroDelRango = precio >= tolerancia.min && precio <= tolerancia.max;
+
+        if (!dentroDelRango) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Precio fuera de rango esperado',
+                html: `El producto tiene un precio base de <strong>${precioBase.toFixed(2)}</strong>.<br>
+                Estás ingresando <strong>${precio.toFixed(2)} ${moneda}</strong>, fuera del rango permitido:<br>
+                <strong>${tolerancia.min.toFixed(2)} a ${tolerancia.max.toFixed(2)}</strong>.`,
+                showCancelButton: true,
+                confirmButtonText: 'Insertar de todas formas',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#198754',
+                cancelButtonColor: '#d33'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    currencyHidden.value = moneda;
+                    form.submit();
+                }
+            });
+            return;
+        }
+
+        // Si todo está OK
+        currencyHidden.value = moneda;
+        form.submit();
+    });
 </script>
+
+
 
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>

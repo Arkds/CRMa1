@@ -100,11 +100,14 @@ include('header.php');
         <h1 class="text-center">Bienvenido(a), <?= htmlspecialchars($username) ?> 👋</h1>
         <hr>
     </div>
-    <div class="asistencia" id="asistencia">
+<div class="asistencia" id="asistencia">
         <?php include('asistencia.php'); ?>
     </div>
 
-    <!-- Tabla de productos relevantes -->
+
+   <!-- Tabla de productos relevantes -->
+<?php if ($role !== 'admin'): ?>
+    <!-- Mostrar directamente para vendedores -->
     <div class="container mt-4">
         <div class="col">
             <section class="card p-3">
@@ -122,19 +125,62 @@ include('header.php');
                     <tbody>
                         <?php foreach ($products as $product): ?>
                             <tr>
-                                <td><?= $product['relevance'] ? '<span class="badge bg-success">Sí</span>' : '<span class="badge bg-secondary">No</span>' ?>
-                                </td>
+                                <td><?= $product['relevance'] ? '<span class="badge bg-success">Sí</span>' : '<span class="badge bg-secondary">No</span>' ?></td>
                                 <td><?= htmlspecialchars($product['name']) ?></td>
                                 <td><?= $product['price'] !== null ? $product['price'] : 'No especificado' ?></td>
                                 <td><?= htmlspecialchars($product['description']) ?></td>
-                                <td><?= htmlspecialchars($product['channel']) ?></td> <!-- 🔹 Mostrar canal -->
+                                <td><?= htmlspecialchars($product['channel']) ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
-
             </section>
         </div>
+    </div>
+<?php else: ?>
+    <!-- Mostrar con botón toggle para admins -->
+    <div class="text-center my-3">
+        <button class="btn btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#tablaProductosAdmin" aria-expanded="false" aria-controls="tablaProductosAdmin">
+            Mostrar / Ocultar Precios de productos
+        </button>
+    </div>
+    <div class="collapse" id="tablaProductosAdmin">
+        <div class="container mt-2">
+            <div class="col">
+                <section class="card p-3">
+                    <h2 class="text-center">Precios de productos</h2>
+                    <table id="relevantProductsTable" class="table table-striped display compact">
+                        <thead>
+                            <tr>
+                                <th>Relevante</th>
+                                <th>Nombre</th>
+                                <th>Precio</th>
+                                <th>Descripción</th>
+                                <th>Canal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($products as $product): ?>
+                                <tr>
+                                    <td><?= $product['relevance'] ? '<span class="badge bg-success">Sí</span>' : '<span class="badge bg-secondary">No</span>' ?></td>
+                                    <td><?= htmlspecialchars($product['name']) ?></td>
+                                    <td><?= $product['price'] !== null ? $product['price'] : 'No especificado' ?></td>
+                                    <td><?= htmlspecialchars($product['description']) ?></td>
+                                    <td><?= htmlspecialchars($product['channel']) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </section>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
+<?php if ($role == 'admin'): ?>
+    <?php include 'resumen_automatico.php'; ?>
+<?php endif; ?>
+
 
         <div class="text-center mb-3">
             <br>
@@ -144,6 +190,7 @@ include('header.php');
             </button>
         </div>
 
+        <!-- Contenedor colapsable para los gráficos -->
         <div class="collapse" id="graphsContainer">
             <?php include('graphs.php'); ?>
         </div>
@@ -156,7 +203,9 @@ include('header.php');
                     Mostrar Panel
                 </button>
             </div>
+            
 
+            <!-- Contenedor colapsable para los gráficos -->
             <div class="collapse" id="panelsigContainer">
                 <?php include('panel_sig.php'); ?>
             </div>
@@ -469,6 +518,8 @@ include('header.php');
     </div>
 </div>
 
+
+
 <!-- Script para DataTables de la tabla de productos -->
 <script>
     $(document).ready(function () {
@@ -621,4 +672,3 @@ if (isset($pdo)) {
 ?>
 
 
-<?php include('footer.php'); ?>

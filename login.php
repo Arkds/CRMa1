@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'username' => $user['username'],
             'role' => $user['role']
         ]);
-        setcookie("user_session", base64_encode($cookie_data), time() + (6 * 3600), "/", "", false, true);
+        setcookie("user_session", base64_encode($cookie_data), time() + (7 * 3600), "/", "", false, true);
 
         header('Location: index.php');
         exit;

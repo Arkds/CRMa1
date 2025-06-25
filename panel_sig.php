@@ -21,46 +21,8 @@ function obtenerVentas($pdo, $inicio, $fin)
         WHERE created_at BETWEEN :inicio AND :fin
     ");
     $stmt->execute([':inicio' => $inicio, ':fin' => $fin]);
+    
     return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
-}
-
-function obtenerTopCursosUltimos7Dias($pdo)
-{
-    $stmt = $pdo->query("
-        SELECT 
-            SUBSTRING_INDEX(product_name, '|', -1) AS curso,
-            COUNT(*) AS total_ventas,
-            SUM(quantity) AS total_cantidad,
-            SUM(CASE WHEN currency = 'MXN' THEN price * quantity ELSE 0 END) AS total_mxn,
-            SUM(CASE WHEN currency = 'PEN' THEN price * quantity ELSE 0 END) AS total_pen
-        FROM sales
-        WHERE created_at >= CURDATE() - INTERVAL 7 DAY
-        GROUP BY curso
-        ORDER BY total_cantidad DESC
-        LIMIT 20
-    ");
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
-
-function obtenerTopCursosSemanaPasada($pdo)
-{
-    $stmt = $pdo->query("
-        SELECT 
-            SUBSTRING_INDEX(product_name, '|', -1) AS curso,
-            COUNT(*) AS total_ventas,
-            SUM(quantity) AS total_cantidad,
-            SUM(CASE WHEN currency = 'MXN' THEN price * quantity ELSE 0 END) AS total_mxn,
-            SUM(CASE WHEN currency = 'PEN' THEN price * quantity ELSE 0 END) AS total_pen
-        FROM sales
-        WHERE created_at BETWEEN CURDATE() - INTERVAL 14 DAY AND CURDATE() - INTERVAL 7 DAY
-        GROUP BY curso
-    ");
-    $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    $map = [];
-    foreach ($result as $row) {
-        $map[$row['curso']] = $row;
-    }
-    return $map;
 }
 
 
@@ -83,17 +45,10 @@ function formatCambio($valor)
     return "<span class=\"$color\">$icono " . abs($valor) . "%</span>";
 }
 
-// KPIs por hora
 $ventasHoy = obtenerVentas($pdo, "$hoy 00:00:00", "$hoy $hora");
 $ventasAyerHora = obtenerVentas($pdo, "$ayer 00:00:00", "$ayer $hora");
 $ventasAyerTotal = obtenerVentas($pdo, "$ayer 00:00:00", "$ayer 23:59:59");
 
-// KPIs por canal (últimos 7 días)
-$ventasPorCanal = obtenerTopCursosUltimos7Dias($pdo);
-$ventasSemanaAnterior = obtenerTopCursosSemanaPasada($pdo);
-
-
-$pdo = null;
 
 $hoyMXN = getVal($ventasHoy, 'total_mxn');
 $hoyPEN = getVal($ventasHoy, 'total_pen');
@@ -108,7 +63,7 @@ $ayerCantMXN = getVal($ventasAyerHora, 'cantidad_mxn');
 $ayerCantPEN = getVal($ventasAyerHora, 'cantidad_pen');
 $ayerFullCantMXN = getVal($ventasAyerTotal, 'cantidad_mxn');
 $ayerFullCantPEN = getVal($ventasAyerTotal, 'cantidad_pen');
-
+$pdo = null;
 ?>
 
 <style>
@@ -220,63 +175,6 @@ $ayerFullCantPEN = getVal($ventasAyerTotal, 'cantidad_pen');
                 </table>
 
             </div>
-        </div>
-    </div>
-</div>
-<div class="row g-4 mt-4">
-    <div class="col-md-8">
-        <div class="card border-dark shadow p-3">
-            <h5 class="card-title text-center">Top 20 Cursos más vendidos (últimos 7 días)</h5>
-            <table class="table table-sm table-bordered text-center">
-                <thead class="table-light">
-                    <tr>
-                        <th>Curso</th>
-                        <th>Ventas</th>
-                        <th>Productos</th>
-                        <th>Total MXN</th>
-                        <th>Total PEN</th>
-                        <th>Total Global</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    <tr class="table-secondary">
-                        <td colspan="6">Comparado con la semana anterior (hace 7 a 14 días)</td>
-                    </tr>
-                    <?php foreach ($ventasPorCanal as $row):
-                        $curso = $row['curso'];
-                        $anterior = $ventasSemanaAnterior[$curso] ?? ['total_ventas' => 0, 'total_cantidad' => 0, 'total_mxn' => 0, 'total_pen' => 0];
-                        ?>
-                        <tr>
-                            <td><?= htmlspecialchars($curso) ?></td>
-                            <td>
-                                <?= $row['total_ventas'] ?>
-                                <br><?= formatCambio(calcPorcentaje($row['total_ventas'], $anterior['total_ventas'])) ?>
-                            </td>
-                            <td>
-                                <?= $row['total_cantidad'] ?>
-                                <br><?= formatCambio(calcPorcentaje($row['total_cantidad'], $anterior['total_cantidad'])) ?>
-                            </td>
-                            <td>
-                                <?= number_format($row['total_mxn'], 2) ?>
-                                <br><?= formatCambio(calcPorcentaje($row['total_mxn'], $anterior['total_mxn'])) ?>
-                            </td>
-                            <td>
-                                <?= number_format($row['total_pen'], 2) ?>
-                                <br><?= formatCambio(calcPorcentaje($row['total_pen'], $anterior['total_pen'])) ?>
-                            </td>
-                            <td class="fw-bold">
-                                <?php $total = $row['total_mxn'] + $row['total_pen'];
-                                $totalAnt = $anterior['total_mxn'] + $anterior['total_pen']; ?>
-                                <?= number_format($total, 2) ?>
-                                <br><?= formatCambio(calcPorcentaje($total, $totalAnt)) ?>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-
-                </tbody>
-
-            </table>
         </div>
     </div>
 </div>

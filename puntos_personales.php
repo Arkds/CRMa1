@@ -22,7 +22,7 @@ $user_constants = [
     'Magaly' => 1,
     'Sonaly' => 1,
     'Frank' => 1,
-    'Esther' => 1,
+    'Esther' => 1.1,
 ];
 
 
@@ -83,10 +83,12 @@ $stmt_ventas_normales->execute([
 ]);
 $ventas_normales = $stmt_ventas_normales->fetchAll();
 
+// Resto del código sigue igual...
 foreach ($ventas_normales as $vn) {
     $total_ventas = $vn['ventas_mxn'] + $vn['ventas_pen'];
     $constante = $user_constants[$vn['username']] ?? 1;
 
+    // Nueva lógica: obtener las ventas individuales para calcular por producto
     $stmt = $pdo->prepare("
     SELECT s.product_name, s.price, s.currency
     FROM sales s
@@ -104,7 +106,7 @@ foreach ($ventas_normales as $vn) {
 
     $puntos_base = 0;
     foreach ($ventas_validas as $venta) {
-        $puntos_base += 15; 
+        $puntos_base += 15; // Cada venta válida da 10 puntos sin importar el canal
     }
 
 

@@ -33,12 +33,27 @@ include('header.php')
         body {
             overflow-x: hidden;
         }
+        main {
+    padding-top: 1rem;
+}
 
-        #menu {
-            height: 100vh;
-            overflow-y: auto;
-            border-right: 1px solid #ccc;
-        }
+
+#menu {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    border-right: 1px solid #ccc;
+    z-index: 1020;
+    background-color: #f8f9fa;
+}
+#menu::-webkit-scrollbar {
+    width: 6px;
+}
+#menu::-webkit-scrollbar-thumb {
+    background-color: #bbb;
+    border-radius: 3px;
+}
 
         .contenido {
             scroll-margin-top: 80px;
@@ -93,16 +108,57 @@ include('header.php')
             display: block;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
+       #buscador-container {
+    position: sticky;
+    top: 0;
+    background-color: #f8f9fa;
+    z-index: 1030;
+    padding: 12px 16px 10px;
+    border-bottom: 1px solid #ccc;
+}
+#indice {
+    margin-top: 0 !important;
+}
+
+#buscador {
+    font-size: 0.95rem;
+}
+#btnSubir {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1050;
+    background-color: #0d6efd;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 45px;
+    height: 45px;
+    font-size: 20px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    display: none;
+    cursor: pointer;
+    transition: opacity 0.3s ease;
+}
+#btnSubir:hover {
+    background-color: #0b5ed7;
+}
+
+
     </style>
 </head>
 
 <body>
+    
     <div class="container-fluid">
         <div class="row">
             <!-- Índice lateral -->
-            <nav id="menu" class="col-md-3 col-sm-4 bg-light p-3">
-                <input type="text" id="buscador" class="form-control" placeholder="Buscar sección...">
-                <ul id="indice" class="nav flex-column mt-3">
+            <nav id="menu" class="col-md-3 col-sm-4 bg-light p-0">
+    <div id="buscador-container" class="p-3">
+        <input type="text" id="buscador" class="form-control" placeholder="Buscar sección...">
+    </div>
+<ul id="indice" class="nav flex-column mt-3 pt-2">
+
                     <li><a class="nav-link" href="#introduccion">1. Introducción</a></li>
                     <li><a class="nav-link nav-sub" href="#seguridad">1.1 Seguridad</a></li>
                     <li><a class="nav-link nav-sub" href="#soporte">1.2 Soporte</a></li>
@@ -593,38 +649,189 @@ include('header.php')
                 <img src="img/recordatorios_botonver.png" alt="Botón Ver recordatorio" class="manual-img">
 
 
-                <h2 id="puntos" class="contenido">5. Sistema de puntos y recompensas</h2>
-                <h3 id="semanales" class="contenido ms-3">5.1 Recompensas semanales</h3>
-                <h4 id="ganancia_semanal" class="contenido ms-4">Ganancia de puntos</h4>
-                <h4 id="visualizar_catalogo" class="contenido ms-4">Visualización de puntos y catálogo de
-                    recompensas
-                </h4>
-                <h3 id="mensuales" class="contenido ms-3">5.2 Recompensas mensuales (grupal)</h3>
-                <h4 id="ganancia_mensual" class="contenido ms-4">Ganancia de puntos</h4>
-                <h4 id="progreso_mensual" class="contenido ms-4">Visualización de puntos y progreso</h4>
+               <h2 id="puntos" class="contenido">5. Sistema de puntos y recompensas</h2>
+<p class="justificado">
+    Se tiene un sistema de puntos donde se premia a la consistencia en el desarrollo de actividades del trabajo, se trata de tres tipos de recompensas: <strong>Semanales</strong>, <strong>Mensuales (grupal)</strong> e <strong>histórico</strong>.
+</p>
+
+<h3 id="semanales" class="contenido ms-3">5.1 Recompensas semanales</h3>
+<p class="justificado">
+    Los puntos ganados se reinician cada lunes a las 00:00 y para ganar puntos solo se toma en cuenta las ventas de lunes a domingo.
+</p>
+
+<ul>
+    <li>
+        <strong>Ganancia de puntos</strong><br>
+        <span class="justificado">
+            La ganancia de puntos se basan en ventas por comisiones y ventas normales, se ganan <strong>100 puntos</strong> por comisión registrada, se ganan <strong>15 puntos</strong> por cada venta normal.
+        </span>
+    </li>
+    <li class="mt-2">
+        <strong>Visualización de puntos y catálogo de recompensas</strong><br>
+        <span class="justificado">
+            Se pueden ver los puntos y las recompensas disponibles en la sección de <em>Mi Progreso</em>, también se pueden reclamar las recompensas alcanzadas, pero solo se pueden reclamar una vez.
+        </span>
+    </li>
+</ul>
+ <img src="img/puntos1.png" alt="a" class="manual-img">
+
+                <<h3 id="mensuales" class="contenido ms-3">5.2 Recompensas mensuales (grupal)</h3>
+<p class="justificado">
+    Se armaron grupos por horarios mañana, tarde y noche, los puntos se reinician cada 1 de cada mes a las 00:00, y para ganar puntos solo se toma en cuenta de lunes a viernes en el horario de su grupo asignado.
+</p>
+
+<ul>
+    <li>
+        <strong>Ganancia de puntos</strong><br>
+        <span class="justificado">
+            Se asignan puntos cada vez que se hace una venta de <strong>150 MXN</strong> o mayor y <strong>29.90 PEN</strong> o mayor. Cada condición suma <strong>180 puntos</strong> y se suma entre los miembros del grupo.
+        </span>
+    </li>
+    <li class="mt-2">
+        <strong>Visualización de puntos y progreso</strong><br>
+        <span class="justificado">
+            Para ello se muestra la recompensa más cercana, una barra de progreso con marcas de los puntos necesaria a conseguir.
+        </span>
+    </li>
+</ul>
+
+<img src="img/recompensas_mensuales_equipo.png" alt="Progreso de recompensas mensuales del equipo" class="manual-img">
+
                 <h3 id="historicos" class="contenido ms-3">5.3 Recompensas históricas</h3>
-                <h4 id="ganancia_historica" class="contenido ms-4">Ganancia de puntos</h4>
-                <h4 id="solicitar_actividad" class="contenido ms-4">Pasos para Solicitar puntos por Actividad
-                    específica
-                </h4>
-                <h3 id="ver_recompensas" class="contenido ms-3">5.4 Visualización de datos de recompensas/puntos
-                </h3>
-                <h4 id="ver_semanal_mensual" class="contenido ms-4">Recompensas semanales y mensuales</h4>
-                <h4 id="ver_historicos" class="contenido ms-4">Recompensas históricas</h4>
-                <h3 id="sanciones" class="contenido ms-3">EXTRA: Sanciones de puntos y bonus administrados por
-                    admin
-                </h3>
+<p class="justificado">
+    Estas recompensas son para siempre desde la fecha que decida poner el administrador, no se reinician hasta que el admin lo decida, para ganar puntos se toman en cuenta todos los días y todos los horarios.
+    <strong>Se accede desde el menú principal en el icono de estadísticas</strong>.
+</p>
+<img src="img/acceso_estadisticas.png" alt="Acceso a estadísticas" class="manual-img">
+
+<h4 id="ganancia_historica" class="contenido ms-4">Ganancia de puntos</h4>
+<p class="justificado">
+    Se asignan puntos cada vez que se hace una venta de cualquier tipo. Se suman <strong>35 puntos</strong> por cada venta.
+    También se pueden solicitar puntos por actividades específicas que son:
+</p>
+<ul>
+    <li><strong>Venta difícil:</strong> Cuando una venta costó muchos recurso humano de convencimiento o de por sí existieron dificultades pero se logró hacer la venta.</li>
+    <li><strong>Seguimiento con tres ventas:</strong> Se hacen un bloque de seguimiento de la sección de seguimientos y se hacen 3 ventas.</li>
+    <li><strong>Ventas cruzadas:</strong> Se venden más de uno o más productos relacionados a un producto ya vendido o negociado.</li>
+</ul>
+
+<h4 id="solicitar_actividad" class="contenido ms-4">Pasos para Solicitar puntos por Actividad específica</h4>
+
+<ul>
+    <li>
+        <strong>Ubicación de sección:</strong> Se encuentra en la parte inferior de la página de puntos históricos.
+    </li>
+</ul>
+<img src="img/solicitud_puntos_formulario.png" alt="Formulario de solicitud de puntos" class="manual-img">
+
+<ul>
+    <li>
+        <strong>Tipo de actividad:</strong> Se selecciona la actividad a solicitar en el campo <em>Tipo de Actividad</em>.
+    </li>
+</ul>
+<img src="img/tipo_actividad_lista.png" alt="Opciones del tipo de actividad" class="manual-img">
+
+<ul>
+    <li>
+        <strong>Enlace a la evidencia:</strong> Se pega el enlace a la evidencia al igual que en comisiones, la ubicación para subir estas imágenes es en la carpeta <strong>00.PUNTOS</strong>.
+    </li>
+</ul>
+<img src="img/carpeta_evidencia.png" alt="Ubicación de carpeta 00.PUNTOS" class="manual-img">
+
+<ul>
+    <li>
+        <strong>Comentarios adicionales:</strong> Se justifica brevemente sobre los puntos que se está solicitando.
+    </li>
+    <li>
+        <strong>Procesamiento de solicitudes:</strong> Un administrador verificará tu solicitud y se mostrará en una tabla el estado de estas.
+    </li>
+</ul>
+<img src="img/tabla_solicitudes.png" alt="Tabla de solicitudes de puntos por actividad" class="manual-img">
+
+                <h3 id="ver_recompensas" class="contenido ms-3">5.4 Visualización de datos de recompensas/puntos</h3>
+
+<h4 id="ver_semanal_mensual" class="contenido ms-4">Recompensas semanales y mensuales</h4>
+<p class="justificado">
+    <strong>Ubicación:</strong> en la página principal, en la sección de catálogos y progresos.
+</p>
+<img src="img/recompensas_disponibles.png" alt="Catálogo de recompensas semanales y mensuales" class="manual-img">
+<img src="img/mi_progreso.png" alt="Gráfico de progreso semanal/mensual y reclamación" class="manual-img">
+<img src="img/recompensas_mensuales_equipo.png" alt="Recompensas mensuales del equipo" class="manual-img">
+
+<h4 id="ver_historicos" class="contenido ms-4">Recompensas históricas</h4>
+<p class="justificado">
+    Ya se mencionó el acceso, que es desde el menú principal en el icono de barras.
+</p>
+<img src="img/acceso_estadisticas.png" alt="Acceso a estadísticas del historial" class="manual-img">
+
+<p class="justificado">
+    En esa página, primero se muestra una barra con el progreso al lado del catálogo.
+</p>
+<img src="img/progreso_historico.png" alt="Progreso de puntos históricos y catálogo" class="manual-img">
+
+<p class="justificado">
+    Cuando se reclama alguna recompensa se podrá hacer desde el catálogo y se mostrará su estado <strong>pendiente</strong> o <strong>pagado</strong>.
+</p>
+<img src="img/recompensas_alcanzadas.png" alt="Recompensas alcanzadas y próximas" class="manual-img">
+
+<p class="justificado">
+    También se muestra una tabla con el historial de puntos asignados.
+</p>
+<img src="img/historial_puntos.png" alt="Historial de puntos asignados" class="manual-img">
+
+
+<h3 id="sanciones" class="contenido ms-3">EXTRA: Sanciones de puntos y bonus administrados por admin</h3>
+<p class="justificado">
+    Se puede sancionar con quitar puntos por un administrador en los siguientes casos:
+</p>
+<ul>
+    <li><strong>Semana sin errores:</strong> Ingreso de ventas y reportes sin problemas ni errores.</li>
+    <li><strong>Error en registro:</strong> Un error en un registro dentro del CRM.</li>
+    <li><strong>Faltar sin aviso:</strong> Faltar un día sin comunicarlo.</li>
+    <li><strong>Engaño/inventar venta:</strong> Si se descubre esta actividad, además de restar <strong>1000 puntos</strong>, se puede suspender temporalmente al usuario del sistema de puntos.</li>
+</ul>
+<img src="img/tipo_puntos_sanciones.png" alt="Tipos de sanción o bonificación" class="manual-img">
+
 
                 <h2 id="asistencias" class="contenido">6. Módulo de Asistencias</h2>
-                <h4 id="acceso_asistencia" class="contenido ms-4">Acceso</h4>
-                <h4 id="ver_asistencias" class="contenido ms-4">Visualización de datos</h4>
-                <h4 id="minutos" class="contenido ms-4">Minutos pendientes por recuperar</h4>
-                <h4 id="historial_asistencia" class="contenido ms-4">Historial de asistencia</h4>
+<p class="justificado">
+    Un espacio para marcar asistencia, para gestionar minutos de recuperación.
+</p>
+
+<h4 id="acceso_asistencia" class="contenido ms-4">Acceso</h4>
+<p class="justificado">
+    En la página de inicio se tiene una sección donde se puede marcar la entrada y salida del turno, desde esa sección se puede acceder al historial de registros de asistencia.
+</p>
+
+<h4 id="ver_asistencias" class="contenido ms-4">Visualización de datos</h4>
+<p class="justificado">
+    Se pueden visualizar los datos en las siguientes secciones.
+</p>
+
+<h4 id="minutos" class="contenido ms-4">Minutos pendientes por recuperar</h4>
+<p class="justificado">
+    Se muestran arriba del todo, se va acumulando de acuerdo a lo que acumules.
+</p>
+<img src="img/minutos_pendientes.png" alt="Minutos pendientes por recuperar" class="manual-img">
+
+<h4 id="historial_asistencia" class="contenido ms-4">Historial de asistencia</h4>
+<p class="justificado">
+    Muestra el historial completo de asistencias.
+</p>
+<img src="img/historial_asistencia.png" alt="Tabla de historial de asistencias" class="manual-img">
+
+<p class="justificado">
+    También se muestra el historial de recuperaciones de hora:
+</p>
+<img src="img/recuperaciones_horas.png" alt="Historial de recuperaciones de horas" class="manual-img">
+
             </main>
 
 
         </div>
     </div>
+    <button id="btnSubir" title="Volver arriba">↑</button>
+
 
     <!-- Buscador -->
     <script>
@@ -639,6 +846,19 @@ include('header.php')
             });
         });
     </script>
+    <script>
+    const btnSubir = document.getElementById("btnSubir");
+
+    window.onscroll = function () {
+        btnSubir.style.display = (document.documentElement.scrollTop > 300) ? "block" : "none";
+    };
+
+    btnSubir.addEventListener("click", () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+</script>
+
+
 </body>
 
 </html>

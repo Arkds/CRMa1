@@ -332,6 +332,7 @@ $pdo = null;
     <table id="certificadosTable" class="table table-striped">
         <thead>
             <tr>
+                <th>ID</th>
                 <th>Código</th>
                 <th>Curso</th>
                 <th>Cliente</th>
@@ -341,9 +342,11 @@ $pdo = null;
                 <th>Acciones</th>
             </tr>
         </thead>
+
         <tbody>
             <?php foreach ($certificados as $cert): ?>
                 <tr>
+                    <td><?= $cert['id'] ?></td>
                     <td><?= $cert['codigo_unico'] ?></td>
                     <td><?= $cert['nombre_curso'] ?></td>
                     <td><?= $cert['cliente_nombre'] ?></td>
@@ -488,7 +491,7 @@ $pdo = null;
             language: {
                 url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
             },
-            order: [[4, 'desc']]
+            order: [[0, 'desc']]
         });
 
         // Variables para el estado del modal

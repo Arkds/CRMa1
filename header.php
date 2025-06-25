@@ -7,11 +7,18 @@
     <link href="src/bootstrapcss.css" rel="stylesheet">
     <link href="src/datatablescss.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+<!-- Bootstrap JS (necesario para dropdowns) -->
+<!-- jQuery primero -->
+<script src="src/jquery.js"></script>
 
-    <script src="src/jquery.js"></script>
-    <script src="src/datatablesjs.js"></script>
-    <script src="src/chartjs.js"></script>
-    <script src="src/chartplugin.js"></script>
+<!-- Bootstrap JS (una sola vez) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- DataTables, Chart.js, etc. -->
+<script src="src/datatablesjs.js"></script>
+<script src="src/chartjs.js"></script>
+<script src="src/chartplugin.js"></script>
+
 
     <title>CRM</title>
 
@@ -134,16 +141,14 @@
                         </button>
                     <?php endif; ?>
 
-                    <div class="nav-item dropdown">
-                        <button class="nav-link btn btn-link text-white dropdown-toggle" id="dropdownGestionarProductos"
-                            data-bs-toggle="dropdown" aria-expanded="false">
-                            Productos
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-dark">
-                            <li><a class="dropdown-item" href="product_crud.php">Gestionar (admin)</a></li>
-                            <li><a class="dropdown-item" href="syllabus_crud.php">Temarios</a></li>
-                        </ul>
-                    </div>
+                    <!-- Productos (sin dropdown, enlaces visibles directamente) -->
+        <button class="nav-link btn btn-link text-white" onclick="window.location.href='product_crud.php';">
+            Productos
+        </button>
+        <button class="nav-link btn btn-link text-white" onclick="window.location.href='syllabus_crud.php';">
+            Temarios
+        </button>
+
 
                     <?php if (isset($isAdmin) && $isAdmin): ?>
                         <button class="nav-link btn btn-link text-white" onclick="window.location.href='report_sales.php';">
@@ -165,6 +170,9 @@
                     <button class="nav-link btn btn-link text-white" onclick="window.location.href='tracin_crud.php';">
                         Seguimientos
                     </button>
+            <button class="nav-link btn btn-link text-white" onclick="window.open('https://drive.google.com/file/d/1IEGJm44NtrGctkGaBfoXY8bnGjbUY4qv/view?usp=sharing', '_blank')">
+                Manual PDF
+            </button>
 
 
                     <?php if (isset($isAdmin) && $isAdmin): ?>
@@ -186,9 +194,6 @@
                     <button class="nav-link btn btn-link text-white nav-icons-big"
                         onclick="window.location.href='manual.php';">
                         <i class="bi bi-file-earmark-text"></i>
-                        <span  style="font-size: 0.75rem;" >
-                            Manual de usuario
-                        </sp>
                     </button>
 
                     <button class="nav-link btn btn-link text-white nav-icons-big"
@@ -243,5 +248,4 @@
             }
         });
     </script>
-    <!-- Bootstrap JS (requerido para el modal) -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  

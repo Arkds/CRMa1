@@ -218,6 +218,10 @@ $stmt = $pdo->prepare("SELECT h.*, u.username as admin_username
 $stmt->execute([$user_id]);
 $historial = $stmt->fetchAll();
 
+$stmt = $pdo->prepare("SELECT drive_folder FROM users WHERE id = ?");
+$stmt->execute([$user_id]);
+$user_drive = $stmt->fetch();
+$drive_folder = $user_drive['drive_folder'] ?? null;
 
 if (!$isAdmin) {
     $stmt = $pdo->prepare("SELECT * FROM solicitudes_puntos 
@@ -349,7 +353,7 @@ include('header.php');
                                                 ?>
 
                                                 <?php if ($reclamo): ?>
-                                                    <span class="badge <?= $reclamo['pagada'] ? 'bg-success' : 'bg-secondary' ?>">
+                                                    <span class="badge <?= $reclamo['pagada'] ? 'bg-info' : 'bg-secondary' ?>">
                                                         ✅ Reclamada<br>
                                                         <small><?= date('d/m/Y H:i', strtotime($reclamo['fecha_reclamo'])) ?></small><br>
                                                         <?= $reclamo['pagada'] ? '<i class="fas fa-check-circle"></i> Pagada' : '⏳ Pendiente' ?>
@@ -495,6 +499,14 @@ include('header.php');
         <div class="card mt-4">
             <div class="card-header bg-info text-white">
                 <h3>Solicitar Puntos por Actividad</h3>
+                <?php if (!empty($drive_folder)): ?>
+        <button class="btn btn-dark mb-3" onclick="window.open('<?= htmlspecialchars($drive_folder) ?>', '_blank');">
+            📁 Carpeta de DRIVE asignada
+        </button>
+
+    <?php else: ?>
+        <button class="btn btn-secondary mb-3" disabled>📁 Carpeta no asignada</button>
+    <?php endif; ?>
             </div>
             <div class="card-body">
                 <?php if (isset($_SESSION['error'])): ?>

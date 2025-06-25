@@ -159,14 +159,14 @@ function calcularPuntosPorEquipo($pdo, $puntos_individuales, $user_constants, $r
     $equipos = [
         'mañana' => [
             'miembros' => [
-                'Sheyla' => ['08:00', '13:00'],
+                'Sheyla' => ['08:00', '12:00'],
                 'Frank' => ['08:00', '14:00']
             ],
             'dias' => ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
         ],
         'tarde' => [
             'miembros' => [
-                'Sheyla' => ['14:00', '17:00'],
+                'Sheyla' => ['13:00', '17:00'],
                 'Sonaly' => ['14:00', '20:00']
             ],
             'dias' => ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']

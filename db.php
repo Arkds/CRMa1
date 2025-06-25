@@ -1,6 +1,6 @@
 <?php
 $host = 'localhost';
-$dbname = '2';
+$dbname = 'crmtru';
 $user = 'root';
 $pass = '';
 

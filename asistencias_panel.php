@@ -167,7 +167,17 @@ include('header.php');
 
                     <?php if ($role === 'admin'): ?>
                         <td><?= htmlspecialchars($a['username']) ?></td><?php endif; ?>
-                    <td><?= $a['fecha'] ?></td>
+                    <td>
+    <?php
+    if (!isset($fechaAnterior) || $fechaAnterior !== $a['fecha']) {
+        echo "<span class='badge bg-secondary'>{$a['fecha']}</span>";
+        $fechaAnterior = $a['fecha'];
+    } else {
+        echo "<span class='text-muted'>{$a['fecha']}</span>";
+    }
+    ?>
+</td>
+
                     <td><?= $a['hora_entrada'] ?? '<span class="text-muted">-</span>' ?></td>
                     <td>
                         <span class="badge bg-<?= $a['tipo_entrada'] === 'tardanza' ? 'danger' : 'success' ?>">

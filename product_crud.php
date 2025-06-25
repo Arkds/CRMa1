@@ -16,10 +16,10 @@ if (isset($_COOKIE['user_session'])) {
         $role = $user_data['role'];
 
         // Restringir acceso si el usuario no es admin
-        if ($role !== 'admin') {
-            header("Location: index.php"); // Redirigir a otra página
-            exit;
-        }
+        //if ($role !== 'admin') {
+        //    header("Location: index.php"); // Redirigir a otra página
+        //    exit;
+        //}
     } else {
         // Si la cookie está corrupta, redirigir al login
         header("Location: login.php");
